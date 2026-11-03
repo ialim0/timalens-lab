@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="fr" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Revoir un labo · TimaLens Lab</title>
+<link rel="icon" href="img/timalens-icon.png">
+<link rel="stylesheet" href="css/lab.css">
+<script type="importmap">{ "imports": { "three": "./vendor/three/three.module.min.js", "three/addons/": "./vendor/three/addons/" } }</script>
+<style>
+  .wrap { max-width: 860px; margin: 0 auto; padding: 16px; display: grid; gap: 14px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: grid; gap: 12px; }
+  .box h1 { margin: 0; font-size: 22px; }
+  video { width: 100%; border-radius: 10px; background: #000; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+  .tiles div { background: var(--ground); border-radius: 10px; padding: 10px; text-align: center; }
+  .tiles b { display: block; font-size: 24px; color: var(--accent); }
+  .tiles span { font-size: 12px; color: var(--muted); }
+  .bar { height: 8px; background: var(--ground); border-radius: 99px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="index.html"><picture><source srcset="img/timalens-logo-dark.png" media="(prefers-color-scheme: dark)"><img src="img/timalens-logo.png" alt="TimaLens" width="168" height="28"></picture><span class="brand-lab">Lab</span></a>
+  <div class="lesson-title" id="title"></div>
+  <div id="lang-switch"></div>
+</header>
+<main class="wrap">
+  <section class="box" id="box">
+    <h1 id="heading">…</h1>
+    <div class="tiles" id="tiles"></div>
+    <div class="row"><span class="muted" id="view-label"></span>
+      <div class="seg" id="view"><button type="button" data-view="2d" aria-pressed="true">2D</button><button type="button" data-view="3d" aria-pressed="false">3D</button></div>
+      <button class="btn primary" id="make"></button>
+      <label class="btn"><span id="open-label"></span><input type="file" id="file" accept=".json,application/json" hidden></label>
+    </div>
+    <div id="out"></div>
+  </section>
+</main>
+<script type="module">
+import { mountLanguageSwitch, strings, uiLanguage } from "./js/i18n.js";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const lang = uiLanguage();
+let lab = null, session = null, view = "2d", t = strings(lang);
+document.documentElement.lang = lang;
+mountLanguageSwitch($("#lang-switch"), lang);
+
+function show() {
+  $("#title").textContent = lab.title;
+  $("#heading").textContent = t.replay_title;
+  const s = session.summary ?? {};
+  $("#tiles").innerHTML = [[s.measures ?? 0, t.measures], [`${s.challenges?.solved ?? 0} / ${s.challenges?.total ?? 0}`, t.challenges],
+    [`${s.predictions?.right ?? 0} / ${s.predictions?.total ?? 0}`, t.predictions_label], [`${s.quiz?.right ?? 0} / ${s.quiz?.total ?? 0}`, t.quiz],
+    [s.questions ?? 0, t.questions_label], [(s.duration_s ?? 0) < 60 ? `${Math.round(s.duration_s ?? 0)} s` : `${Math.round(s.duration_s / 60)} min`, t.duration_label]]
+    .map(([v, name]) => `<div><b>${esc(v)}</b><span>${esc(name)}</span></div>`).join("");
+  view = session.events.filter((e) => e.kind === "view").at(-1)?.view ?? lab.view ?? "2d";
+  for (const b of document.querySelectorAll("#view [data-view]")) b.setAttribute("aria-pressed", String(b.dataset.view === view));
+  make();
+}
+$("#view").onclick = (e) => { const b = e.target.closest("[data-view]"); if (!b) return; view = b.dataset.view; for (const x of document.querySelectorAll("#view [data-view]")) x.setAttribute("aria-pressed", String(x.dataset.view === view)); };
+$("#make").onclick = () => make();
+$("#file").onchange = async () => {
+  try {
+    session = JSON.parse(await $("#file").files[0].text());
+    lab = await (await fetch(`/api/labs/${encodeURIComponent(session.lab)}`)).json();
+    show();
+  } catch (error) { $("#out").textContent = error.message; }
+};
+
+async function make() {
+  if (!session) return;
+  $("#make").disabled = true;
+  $("#out").innerHTML = `<div class="muted">${t.making_video} <span id="pct">0</span> %</div><div class="bar"><i id="bar"></i></div>`;
+  try {
+    const { renderVideo } = await import("./js/video.js");
+    const video = await renderVideo({ lab, session, t, view, onProgress: (p) => { $("#bar").style.width = `${Math.round(p * 100)}%`; $("#pct").textContent = Math.round(p * 100); } });
+    const url = URL.createObjectURL(video.blob);
+    $("#out").innerHTML = `<video src="${url}" controls autoplay muted playsinline></video>
+      <div class="row"><a class="btn primary" href="${url}" download="timalens-lab.${video.extension}">⬇ ${t.download_video}</a><span class="muted">${Math.round(video.seconds)} s</span></div>`;
+  } catch (error) {
+    $("#out").innerHTML = `<div class="muted">${t.video_failed} ${esc(error.message)}</div>`;
+  } finally { $("#make").disabled = false; }
+}
+
+$("#view-label").textContent = t.video_view;
+$("#make").textContent = `🎬 ${t.make_video}`;
+$("#open-label").textContent = t.open_file;
+const id = new URLSearchParams(location.search).get("session");
+if (id) {
+  fetch(`/api/sessions/${encodeURIComponent(id)}`).then((r) => r.ok ? r.json() : Promise.reject(new Error(r.status)))
+    .then((body) => { lab = body.lab; session = body.session; show(); })
+    .catch(() => { $("#heading").textContent = t.replay_title; $("#out").textContent = "?"; });
+} else $("#heading").textContent = t.replay_title;
+</script>
+</body>
+</html>

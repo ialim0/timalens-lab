@@ -1,0 +1,16 @@
+# Local run: `docker compose up --build`, then open http://localhost:8080
+services:
+  app:
+    build: .
+    image: timalens-lab:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    volumes:
+      - lab-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  lab-data:

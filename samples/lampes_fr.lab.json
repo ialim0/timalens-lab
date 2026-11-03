@@ -1,0 +1,60 @@
+{
+ "version": 1,
+ "lab": "circuits",
+ "language": "fr",
+ "title": "Lampes en série et en dérivation",
+ "level": "Collège, 5e",
+ "view": "3d",
+ "summary": "Dans un circuit en série, les lampes se partagent la tension de la pile et brillent moins ; si l'une est dévissée, tout s'éteint. En dérivation, chaque lampe reçoit toute la tension de la pile, et l'intensité dans la branche principale est la somme des intensités des branches : c'est la loi des nœuds.",
+ "objectives": [
+  "Comparer l'éclat de lampes branchées en série et en dérivation",
+  "Mesurer l'intensité dans chaque branche avec un ampèremètre",
+  "Vérifier la loi des nœuds : I = I1 + I2",
+  "Expliquer pourquoi les lampes d'une maison sont branchées en dérivation"
+ ],
+ "formulas": [
+  {"text": "I = I1 + I2", "meaning": "en dérivation, l'intensité de la branche principale est la somme des intensités des branches (en A)"},
+  {"text": "I = I1 = I2", "meaning": "en série, l'intensité est la même partout"}
+ ],
+ "misconceptions": [
+  "La première lampe « prend » le courant et la deuxième en reçoit moins : en série, l'intensité est la même dans les deux lampes.",
+  "Ajouter une lampe en dérivation fait baisser l'éclat des autres : non, chacune reçoit toute la tension de la pile ; c'est la pile qui débite plus.",
+  "Le courant sort de la pile et s'arrête dans la lampe : il circule dans toute la boucle, et revient à la pile."
+ ],
+ "presets": [
+  {"id": "serie", "title": "Deux lampes en série", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "L1", "type": "bulb", "R": 12, "P": 3}, {"id": "L2", "type": "bulb", "R": 12, "P": 3}], "ammeter": true},
+  {"id": "derivation", "title": "Deux lampes en dérivation", "topology": "parallel", "battery": {"V": 6},
+   "elements": [{"id": "L1", "type": "bulb", "R": 12, "P": 3}, {"id": "L2", "type": "bulb", "R": 12, "P": 3}], "ammeter": true, "branch_ammeters": true},
+  {"id": "interrupteur", "title": "Une lampe commandée", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "S1", "type": "switch", "closed": false}, {"id": "L1", "type": "bulb", "R": 12, "P": 3}], "ammeter": true}
+ ],
+ "activities": [
+  {"id": "allumer", "title": "Allumer une lampe", "preset": "interrupteur",
+   "steps": [
+    {"kind": "predict", "question": "L'interrupteur est ouvert. Que se passe-t-il si on le ferme ?", "choices": ["Rien, la lampe reste éteinte", "La lampe s'allume", "La pile se décharge sans allumer la lampe"], "answer": 1, "why": "Fermer l'interrupteur ferme la boucle : le courant peut circuler dans tout le circuit."},
+    {"kind": "do", "instruction": "Touche l'interrupteur S1 pour le fermer.", "goals": [{"lit": "L1"}]},
+    {"kind": "observe", "question": "Que montre l'ampèremètre quand l'interrupteur est ouvert ? Et fermé ?"}
+   ],
+   "takeaway": "Le courant ne circule que si la boucle est fermée : un interrupteur ouvert coupe tout le circuit."},
+  {"id": "comparer", "title": "Série ou dérivation ?", "preset": "serie",
+   "steps": [
+    {"kind": "predict", "question": "Deux lampes identiques sont en série sur une pile de 6 V. Comment brillent-elles, comparées à une seule lampe ?", "choices": ["Plus fort", "Pareil", "Moins fort"], "answer": 2, "why": "En série, les deux lampes se partagent la tension de la pile : chacune n'a que 3 V."},
+    {"kind": "observe", "question": "Regarde l'éclat des lampes et l'intensité. Passe maintenant au circuit en dérivation (onglet Défis) : qu'est-ce qui change ?"}
+   ],
+   "takeaway": "En série, les lampes se partagent la tension et brillent moins. En dérivation, chacune a toute la tension de la pile."}
+ ],
+ "challenges": [
+  {"id": "noeuds", "title": "La loi des nœuds", "statement": "Change la lampe L2 pour que l'ampèremètre principal A1 indique environ 0,75 A. Regarde A2 et A3 : que vaut A2 + A3 ?", "preset": "derivation", "locked": ["B1", "L1"],
+   "goals": [{"quantity": "current", "component": "A1", "min": 0.7, "max": 0.8}, {"not_burnt": true}],
+   "hint": "L1 prend 0,5 A. Il reste 0,25 A pour L2 : avec 6 V à ses bornes, quelle résistance faut-il ?"},
+  {"id": "eclat", "title": "Plein éclat en série", "statement": "Règle la pile pour que les deux lampes en série brillent normalement, sans les griller.", "preset": "serie", "locked": ["L1", "L2"],
+   "goals": [{"quantity": "brightness", "component": "L1", "min": 0.9, "max": 1.3}, {"not_burnt": true}],
+   "hint": "Chaque lampe est faite pour 6 V. En série, elles se partagent la tension de la pile."}
+ ],
+ "quiz": [
+  {"question": "Dans une maison, les lampes sont branchées…", "choices": ["en série", "en dérivation", "au hasard"], "answer": 1, "explanation": "En dérivation : chaque lampe a toute la tension du secteur, et on peut en éteindre une sans éteindre les autres."},
+  {"question": "En dérivation, I1 = 0,5 A et I2 = 0,3 A. Que vaut I dans la branche principale ?", "choices": ["0,2 A", "0,5 A", "0,8 A"], "answer": 2, "explanation": "Loi des nœuds : I = I1 + I2 = 0,8 A."},
+  {"question": "Deux lampes en série : on dévisse L1. Que fait L2 ?", "choices": ["Elle brille plus", "Elle s'éteint", "Rien ne change"], "answer": 1, "explanation": "En série il n'y a qu'une boucle : l'ouvrir n'importe où coupe le courant partout."}
+ ]
+}

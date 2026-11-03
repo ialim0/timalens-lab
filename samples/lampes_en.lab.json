@@ -1,0 +1,60 @@
+{
+ "version": 1,
+ "lab": "circuits",
+ "language": "en",
+ "title": "Bulbs in series and in parallel",
+ "level": "Lower secondary, Grade 7",
+ "view": "3d",
+ "summary": "In a series circuit, bulbs share the battery's voltage and glow less; if one is unscrewed, everything goes out. In parallel, each bulb gets the battery's full voltage, and the current in the main branch is the sum of the currents in the branches: this is the junction rule.",
+ "objectives": [
+  "Compare the brightness of bulbs connected in series and in parallel",
+  "Measure the current in each branch with an ammeter",
+  "Check the junction rule: I = I1 + I2",
+  "Explain why the lights in a house are connected in parallel"
+ ],
+ "formulas": [
+  {"text": "I = I1 + I2", "meaning": "in parallel, the current in the main branch is the sum of the currents in the branches (in A)"},
+  {"text": "I = I1 = I2", "meaning": "in series, the current is the same everywhere"}
+ ],
+ "misconceptions": [
+  "The first bulb “takes” the current and the second gets less: in series, the current is the same in both bulbs.",
+  "Adding a bulb in parallel makes the others dimmer: no, each gets the battery's full voltage; it is the battery that delivers more current.",
+  "Current leaves the battery and stops in the bulb: it flows all the way round the loop and back to the battery."
+ ],
+ "presets": [
+  {"id": "serie", "title": "Two bulbs in series", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "L1", "type": "bulb", "R": 12, "P": 3}, {"id": "L2", "type": "bulb", "R": 12, "P": 3}], "ammeter": true},
+  {"id": "derivation", "title": "Two bulbs in parallel", "topology": "parallel", "battery": {"V": 6},
+   "elements": [{"id": "L1", "type": "bulb", "R": 12, "P": 3}, {"id": "L2", "type": "bulb", "R": 12, "P": 3}], "ammeter": true, "branch_ammeters": true},
+  {"id": "interrupteur", "title": "A bulb with a switch", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "S1", "type": "switch", "closed": false}, {"id": "L1", "type": "bulb", "R": 12, "P": 3}], "ammeter": true}
+ ],
+ "activities": [
+  {"id": "allumer", "title": "Light a bulb", "preset": "interrupteur",
+   "steps": [
+    {"kind": "predict", "question": "The switch is open. What happens if you close it?", "choices": ["Nothing, the bulb stays off", "The bulb lights up", "The battery runs down without lighting the bulb"], "answer": 1, "why": "Closing the switch closes the loop: current can flow all the way round the circuit."},
+    {"kind": "do", "instruction": "Tap the switch S1 to close it.", "goals": [{"lit": "L1"}]},
+    {"kind": "observe", "question": "What does the ammeter show when the switch is open? And when it is closed?"}
+   ],
+   "takeaway": "Current flows only if the loop is closed: an open switch cuts the whole circuit."},
+  {"id": "comparer", "title": "Series or parallel?", "preset": "serie",
+   "steps": [
+    {"kind": "predict", "question": "Two identical bulbs are in series on a 6 V battery. How bright are they, compared with a single bulb?", "choices": ["Brighter", "The same", "Dimmer"], "answer": 2, "why": "In series, the two bulbs share the battery's voltage: each gets only 3 V."},
+    {"kind": "observe", "question": "Look at the bulbs' brightness and the current. Now go to the parallel circuit (Challenges tab): what changes?"}
+   ],
+   "takeaway": "In series, bulbs share the voltage and glow less. In parallel, each one gets the battery's full voltage."}
+ ],
+ "challenges": [
+  {"id": "noeuds", "title": "The junction rule", "statement": "Change bulb L2 so that the main ammeter A1 reads about 0.75 A. Look at A2 and A3: what is A2 + A3?", "preset": "derivation", "locked": ["B1", "L1"],
+   "goals": [{"quantity": "current", "component": "A1", "min": 0.7, "max": 0.8}, {"not_burnt": true}],
+   "hint": "L1 takes 0.5 A. That leaves 0.25 A for L2: with 6 V across it, what resistance does it need?"},
+  {"id": "eclat", "title": "Full brightness in series", "statement": "Set the battery so that both bulbs in series glow normally, without burning them out.", "preset": "serie", "locked": ["L1", "L2"],
+   "goals": [{"quantity": "brightness", "component": "L1", "min": 0.9, "max": 1.3}, {"not_burnt": true}],
+   "hint": "Each bulb is made for 6 V. In series, they share the battery's voltage."}
+ ],
+ "quiz": [
+  {"question": "In a house, the lights are connected…", "choices": ["in series", "in parallel", "at random"], "answer": 1, "explanation": "In parallel: each light gets the mains' full voltage, and you can switch one off without switching off the others."},
+  {"question": "In parallel, I1 = 0.5 A and I2 = 0.3 A. What is the current I in the main branch?", "choices": ["0.2 A", "0.5 A", "0.8 A"], "answer": 2, "explanation": "Junction rule: I = I1 + I2 = 0.8 A."},
+  {"question": "Two bulbs in series: you unscrew L1. What does L2 do?", "choices": ["It glows brighter", "It goes out", "Nothing changes"], "answer": 1, "explanation": "In series there is only one loop: opening it anywhere stops the current everywhere."}
+ ]
+}

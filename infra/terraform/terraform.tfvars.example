@@ -1,0 +1,15 @@
+# Copy to terraform.tfvars (git-ignored) and fill in.
+# Pass the API key through the environment instead of this file:
+#   export TF_VAR_model_api_key=...
+
+project_id = "my-gcp-project"
+region     = "europe-west1"
+
+# Keep one instance warm for a live demo (costs a little while idle)
+# min_instances = 1
+
+# Non-secret app settings
+# env = {
+#   PLANNER_MODEL  = "muse-spark-1.3"
+#   PLANNER_EFFORT = "medium"
+# }

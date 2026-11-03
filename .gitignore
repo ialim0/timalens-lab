@@ -1,0 +1,31 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+# App data: generated labs and saved sessions
+data/
+
+# Secrets: never commit them
+.env
+.env.*
+!.env.example
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+.terraform.tfstate.lock.info
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

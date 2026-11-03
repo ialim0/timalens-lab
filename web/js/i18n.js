@@ -1,0 +1,148 @@
+// The lab's interface in French and English (the lab's own content comes in its language).
+const STRINGS = {
+  fr: {
+    tools: "Outils", select: "Choisir", wire: "Fil", erase: "Gomme", reset: "Recommencer", electrons: "Électrons", conventional: "Sens conventionnel",
+    guide: "Guide", challenges: "Défis", measures: "Mesures", tutor: "Tuteur", quiz: "Quiz", lesson: "Le cours",
+    objectives: "Objectifs", formulas: "Formules", start: "Commencer", next: "Suivant", done: "Terminé", check: "Vérifier",
+    predict: "Prédis d'abord", your_answer: "Ta réponse", correct: "Exact !", not_quite: "Pas tout à fait.", why: "Pourquoi",
+    goal_met: "Objectif atteint", goal_pending: "Pas encore", hint: "Indice", success: "Bravo, défi réussi !", locked: "verrouillé",
+    record: "Enregistrer la mesure", clear: "Effacer", export: "Exporter (CSV)", measure_on: "Mesurer sur", slope: "Pente", points_needed: "mesures enregistrées",
+    ask_placeholder: "Pose une question sur ce que tu observes…", send: "Envoyer", mic: "Parler", listening: "J'écoute…", speak: "Lire à voix haute",
+    tutor_offline: "Le tuteur n'est pas joignable pour l'instant. Le laboratoire fonctionne quand même.", thinking: "Le tuteur réfléchit…",
+    explain_this: "Explique-moi ce que je vois", short: "Court-circuit ! La pile débite un courant énorme.", burnt: "a grillé", repair: "Réparer", burnt_advice: "a grillé : trop de courant ! Change le circuit pour réduire l'intensité, puis touche-la et répare-la.",
+    voltage: "Tension", current: "Intensité", power: "Puissance", brightness: "Éclat", value: "Valeur", closed: "fermé", open: "ouvert", flip: "Retourner", remove: "Retirer",
+    score: "Score", takeaway: "À retenir", sample: "Exemple fourni avec TimaLens Lab (rédigé à la main)", generated: "Laboratoire créé par Muse Spark à partir du cours",
+    place_hint: "Choisis un composant, puis touche un segment de la grille pour le poser.",
+    build_in_2d: "Vue 3D : touche un composant pour le régler, fais glisser pour tourner. Pour construire, passe en 2D.",
+    finish: "Terminer", finish_title: "Ton labo est terminé !", keep_going: "Continuer le labo",
+    make_video: "Créer la vidéo du labo", making_video: "Création de la vidéo…", download_video: "Télécharger la vidéo", share: "Partager",
+    video_view: "Vue de la vidéo", save_session: "Sauvegarder mon labo", saved: "Labo sauvegardé. Le lien pour le revoir :", copy: "Copier le lien", copied: "Copié ✓",
+    download_log: "Télécharger le fichier du labo (.json)", save_failed: "Pas de connexion : télécharge le fichier, il pourra être envoyé plus tard.",
+    report: "Rapport de laboratoire", predictions_label: "Prédictions justes", questions_label: "Questions au tuteur", duration_label: "Durée",
+    experiment_label: "Expérience", challenge_label: "Défi", measure_label: "Mesure", readings_label: "Les appareils indiquent",
+    video_kicker: "Laboratoire virtuel réalisé avec TimaLens Lab", video_engine: "Chaque valeur est calculée par le moteur de circuits · tuteur Muse Spark",
+    video_failed: "La vidéo n'a pas pu être créée sur cet appareil :", replay_title: "Revoir un labo", open_file: "Ouvrir un fichier de labo",
+    content_in: "Le contenu de ce labo est en {lang}.", translate: "Le traduire en français avec Muse Spark", translating: "Muse Spark traduit le labo…", translate_failed: "La traduction n'a pas pu être faite :",
+    lang_names: { fr: "français", en: "anglais" },
+  },
+  en: {
+    tools: "Tools", select: "Select", wire: "Wire", erase: "Eraser", reset: "Start over", electrons: "Electrons", conventional: "Conventional current",
+    guide: "Guide", challenges: "Challenges", measures: "Measurements", tutor: "Tutor", quiz: "Quiz", lesson: "The lesson",
+    objectives: "Objectives", formulas: "Formulas", start: "Start", next: "Next", done: "Done", check: "Check",
+    predict: "Predict first", your_answer: "Your answer", correct: "Right!", not_quite: "Not quite.", why: "Why",
+    goal_met: "Goal met", goal_pending: "Not yet", hint: "Hint", success: "Well done, challenge complete!", locked: "locked",
+    record: "Record measurement", clear: "Clear", export: "Export (CSV)", measure_on: "Measure on", slope: "Slope", points_needed: "measurements recorded",
+    ask_placeholder: "Ask about what you see…", send: "Send", mic: "Speak", listening: "Listening…", speak: "Read aloud",
+    tutor_offline: "The tutor can't be reached right now. The lab still works.", thinking: "The tutor is thinking…",
+    explain_this: "Explain what I see", short: "Short circuit! The battery is delivering a huge current.", burnt: "burnt out", repair: "Repair", burnt_advice: "burnt out: too much current! Change the circuit to lower the current, then tap it and repair it.",
+    voltage: "Voltage", current: "Current", power: "Power", brightness: "Brightness", value: "Value", closed: "closed", open: "open", flip: "Flip", remove: "Remove",
+    score: "Score", takeaway: "Key idea", sample: "Sample lab shipped with TimaLens Lab (written by hand)", generated: "Lab built by Muse Spark from the lesson",
+    place_hint: "Pick a component, then tap a segment of the grid to place it.",
+    build_in_2d: "3D view: tap a part to adjust it, drag to turn. To build, switch to 2D.",
+    finish: "Finish", finish_title: "Your lab is done!", keep_going: "Keep going",
+    make_video: "Make the lab's video", making_video: "Making the video…", download_video: "Download the video", share: "Share",
+    video_view: "Video view", save_session: "Save my lab", saved: "Lab saved. The link to watch it again:", copy: "Copy link", copied: "Copied ✓",
+    download_log: "Download the lab file (.json)", save_failed: "No connection: download the file, it can be sent later.",
+    report: "Lab report", predictions_label: "Right predictions", questions_label: "Questions to the tutor", duration_label: "Time",
+    experiment_label: "Experiment", challenge_label: "Challenge", measure_label: "Measurement", readings_label: "The meters read",
+    video_kicker: "A virtual lab made with TimaLens Lab", video_engine: "Every value is computed by the circuit engine · Muse Spark tutor",
+    video_failed: "The video could not be made on this device:", replay_title: "Watch a lab again", open_file: "Open a lab file",
+    content_in: "This lab's content is in {lang}.", translate: "Translate it into English with Muse Spark", translating: "Muse Spark is translating the lab…", translate_failed: "The translation could not be made:",
+    lang_names: { fr: "French", en: "English" },
+  },
+};
+
+export function strings(language) {
+  return STRINGS[(language ?? "en").slice(0, 2)] ?? STRINGS.en;
+}
+
+// ---------------------------------------------------------------- the interface's language
+// The interface follows the visitor (French or English), whatever the lab's own language:
+// ?lang= in the address, then the visitor's last choice, then the browser's language.
+const KEY = "timalens-lang";
+export const UI_LANGUAGES = ["fr", "en"];
+export function uiLanguage() {
+  const asked = new URLSearchParams(location.search).get("lang");
+  if (UI_LANGUAGES.includes(asked)) return asked;
+  try { const saved = localStorage.getItem(KEY); if (UI_LANGUAGES.includes(saved)) return saved; } catch { /* private window */ }
+  return (navigator.language ?? "fr").toLowerCase().startsWith("en") ? "en" : "fr";
+}
+export function setUiLanguage(language) {
+  try { localStorage.setItem(KEY, language); } catch { /* the address keeps it */ }
+  const url = new URL(location.href);
+  url.searchParams.set("lang", language);
+  location.replace(url);
+}
+/** A FR | EN switch in `el`; every page shows one in its header. */
+export function mountLanguageSwitch(el, current = uiLanguage()) {
+  el.classList.add("seg", "lang");
+  el.setAttribute("role", "group");
+  el.setAttribute("aria-label", current === "fr" ? "Langue" : "Language");
+  el.innerHTML = UI_LANGUAGES.map((l) => `<button type="button" data-lang="${l}" aria-pressed="${l === current}" lang="${l}">${l.toUpperCase()}</button>`).join("");
+  el.onclick = (e) => { const b = e.target.closest("[data-lang]"); if (b && b.dataset.lang !== current) setUiLanguage(b.dataset.lang); };
+}
+/** Fill every [data-i18n] element of the page from a dictionary (and [data-i18n-placeholder]). */
+export function translatePage(dict) {
+  for (const el of document.querySelectorAll("[data-i18n]")) { const v = dict[el.dataset.i18n]; if (v !== undefined) el.innerHTML = v; }
+  for (const el of document.querySelectorAll("[data-i18n-placeholder]")) { const v = dict[el.dataset.i18nPlaceholder]; if (v !== undefined) el.placeholder = v; }
+}
+
+// ---------------------------------------------------------------- the teacher's page
+export const TEACHER = {
+  fr: {
+    page_title: "TimaLens Lab · Transformez un cours en laboratoire interactif",
+    try_sample: "Essayer un exemple",
+    hero: "D'une leçon qu'on regarde<br>à une expérience qu'on <em>vit</em>.",
+    hero_text: "Téléverse ton cours d'électricité. Muse Spark le transforme en laboratoire interactif, en 2D ou en 3D : des circuits à construire et à mesurer, des défis, un quiz et un tuteur qui connaît ton cours. Ça marche sur un petit téléphone, et ça se partage d'un lien.",
+    make: "Créer un laboratoire", drop: "Dépose ton cours ici",
+    drop_hint: "PDF, Word, PowerPoint, texte, une photo du tableau ou du cahier, ou un enregistrement audio/vidéo du cours",
+    or_paste: "ou colle le texte du cours",
+    paste_placeholder: "La loi d'Ohm : la tension U aux bornes d'un conducteur ohmique est proportionnelle à l'intensité I…",
+    language: "Langue du laboratoire", same_as_lesson: "Celle du cours", other_languages: "Langues africaines (contenu du labo)",
+    level: "Niveau", level_placeholder: "ex. 4e, 3e, seconde",
+    view: "Vue du laboratoire", view_auto: "Automatique : Muse Spark choisit selon le cours", view_2d: "2D : le schéma, les symboles", view_3d: "3D : la paillasse, les vrais composants",
+    create: "Créer le laboratoire",
+    stage_reading: "Lecture du cours", stage_designing: "Muse Spark conçoit le laboratoire", stage_checking: "Le moteur résout chaque circuit et vérifie chaque défi", stage_ready: "Laboratoire prêt",
+    how: "Comment ça marche",
+    how1: "Muse Spark lit tout le cours<small>Même une photo du tableau ou du cahier, ou un cours enregistré (Muse Voice Transcribe) : notions, formules, notation, erreurs fréquentes, niveau.</small>",
+    how2: "Il configure le laboratoire<small>Circuits de départ, expériences guidées « prédis → teste → observe », défis, quiz, et la vue 2D ou 3D.</small>",
+    how3: "Le moteur physique vérifie tout<small>Il résout chaque circuit et prouve que chaque défi est faisable. L'IA ne calcule jamais la physique.</small>",
+    how4: "L'élève expérimente, en 2D ou en 3D<small>Il construit, mesure, trace U(I) et pose ses questions au tuteur, à l'écrit ou à la voix.</small>",
+    how5: "Il repart avec la vidéo de son labo<small>Chaque séance est enregistrée en quelques Ko ; la vidéo MP4 est recalculée image par image par le même moteur, prête pour WhatsApp.</small>",
+    labs: "Laboratoires", sample: "exemple", generated: "créé par Muse Spark",
+    footer: "TimaLens Lab · Meta Muse Spark (conception, traduction et tuteur), Muse Voice Transcribe (cours enregistrés et questions orales) · moteur de circuits déterministe, open source.",
+    need_lesson: "Ajoute un fichier, ou colle au moins quelques paragraphes du cours.",
+    server_error: "Le serveur n'a pas pu lire ce cours.", interrupted: "La création a été interrompue (le serveur a redémarré ?).",
+    unsupported: "Ce cours ne parle pas de circuits électriques :", failed: "La création a échoué :",
+    ready: "<b>Ton laboratoire est prêt.</b><br>Partage ce lien avec tes élèves :", open_lab: "Ouvrir le laboratoire", copy: "Copier le lien", copied: "Copié ✓",
+    share_text: "Mon laboratoire TimaLens :",
+  },
+  en: {
+    page_title: "TimaLens Lab · Turn a lesson into an interactive lab",
+    try_sample: "Try a sample",
+    hero: "From watching a lesson<br>to <em>experiencing</em> it.",
+    hero_text: "Upload your electricity lesson. Muse Spark turns it into an interactive lab, in 2D or 3D: circuits to build and measure, challenges, a quiz and a tutor who knows your lesson. It runs on a basic phone and is shared with a single link.",
+    make: "Create a lab", drop: "Drop your lesson here",
+    drop_hint: "PDF, Word, PowerPoint, text, a photo of the blackboard or a notebook, or an audio/video recording of the class",
+    or_paste: "or paste the lesson's text",
+    paste_placeholder: "Ohm's law: the voltage V across a resistor is proportional to the current I through it…",
+    language: "Language of the lab", same_as_lesson: "The lesson's language", other_languages: "African languages (lab content)",
+    level: "Level", level_placeholder: "e.g. Grade 8, Year 9",
+    view: "Lab view", view_auto: "Automatic: Muse Spark chooses from the lesson", view_2d: "2D: the schematic and its symbols", view_3d: "3D: the lab bench, real-looking parts",
+    create: "Create the lab",
+    stage_reading: "Reading the lesson", stage_designing: "Muse Spark designs the lab", stage_checking: "The engine solves every circuit and checks every challenge", stage_ready: "Lab ready",
+    how: "How it works",
+    how1: "Muse Spark reads the whole lesson<small>Even a photo of the blackboard or a notebook, or a recorded class (Muse Voice Transcribe): concepts, formulas, notation, common mistakes, level.</small>",
+    how2: "It configures the lab<small>Starting circuits, guided “predict → test → observe” experiments, challenges, a quiz, and the 2D or 3D view.</small>",
+    how3: "The physics engine checks everything<small>It solves every circuit and proves every challenge can be met. The AI never computes the physics.</small>",
+    how4: "Students experiment, in 2D or 3D<small>They build, measure, plot U(I) and ask the tutor, typing or speaking.</small>",
+    how5: "They leave with a video of their lab<small>Each session is recorded in a few KB; the MP4 is recomputed frame by frame by the same engine, ready for WhatsApp.</small>",
+    labs: "Labs", sample: "sample", generated: "made by Muse Spark",
+    footer: "TimaLens Lab · Meta Muse Spark (design, translation and tutor), Muse Voice Transcribe (recorded lessons and spoken questions) · deterministic circuit engine, open source.",
+    need_lesson: "Add a file, or paste at least a few paragraphs of the lesson.",
+    server_error: "The server could not read this lesson.", interrupted: "Making the lab was interrupted (did the server restart?).",
+    unsupported: "This lesson is not about electric circuits:", failed: "Making the lab failed:",
+    ready: "<b>Your lab is ready.</b><br>Share this link with your students:", open_lab: "Open the lab", copy: "Copy link", copied: "Copied ✓",
+    share_text: "My TimaLens lab:",
+  },
+};

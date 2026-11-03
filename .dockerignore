@@ -1,0 +1,19 @@
+# keep the build context small: only what the image needs
+.git
+.github
+.venv
+.env
+.env.*
+!.env.example
+data
+docs
+infra
+tests
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+*.egg-info
+demo
+Makefile
+docker-compose.yml

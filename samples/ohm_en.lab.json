@@ -1,0 +1,60 @@
+{
+ "version": 1,
+ "lab": "circuits",
+ "language": "en",
+ "title": "Ohm's law in the lab",
+ "level": "Lower secondary, Grade 9",
+ "summary": "In a circuit, the voltage U across a resistor is proportional to the current I flowing through it: U = R × I. The resistance R, in ohms, measures how strongly a component opposes the flow of current.",
+ "objectives": [
+  "Measure the voltage across a resistor and the current through it",
+  "Plot the graph U = f(I) and recognise a straight line through the origin",
+  "Work out a resistance from measurements: R = U / I",
+  "Predict how a resistor changes the brightness of an LED"
+ ],
+ "formulas": [
+  {"text": "U = R × I", "meaning": "U in volts (V), R in ohms (Ω), I in amperes (A)"},
+  {"text": "R = U / I", "meaning": "the slope of the line U = f(I) is the resistance"}
+ ],
+ "misconceptions": [
+  "Current gets used up in a resistor: in fact, the current is the same everywhere in a series circuit.",
+  "A bigger resistance lets more current through: it is the opposite, for the same voltage the current falls as R rises.",
+  "A battery always gives the same current: it gives a voltage; the current depends on the circuit."
+ ],
+ "presets": [
+  {"id": "ohm", "title": "A resistor and its meters", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "R1", "type": "resistor", "R": 100}], "ammeter": true, "voltmeter_on": "R1"},
+  {"id": "led", "title": "Protecting an LED", "topology": "series", "battery": {"V": 9},
+   "elements": [{"id": "R1", "type": "resistor", "R": 470}, {"id": "D1", "type": "led"}], "ammeter": true},
+  {"id": "two", "title": "Two resistors in series", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "R1", "type": "resistor", "R": 100}, {"id": "R2", "type": "resistor", "R": 200}], "ammeter": true, "voltmeter_on": "R2"}
+ ],
+ "activities": [
+  {"id": "discover", "title": "Discover Ohm's law", "preset": "ohm",
+   "steps": [
+    {"kind": "predict", "question": "If you double the battery's voltage, what happens to the current through the resistor?", "choices": ["It stays the same", "It doubles", "It halves"], "answer": 1, "why": "U = R × I: with R fixed, I is proportional to U."},
+    {"kind": "measure", "instruction": "Change the battery's voltage (tap the battery) and record at least 4 measurements of U and I with the “Record measurement” button.", "points": 4},
+    {"kind": "observe", "question": "Do the points make a straight line through the origin? What is its slope?"}
+   ],
+   "takeaway": "U and I are proportional: the slope of the line U = f(I) is the resistance, here about 100 Ω."},
+  {"id": "series", "title": "Does current get used up?", "preset": "two",
+   "steps": [
+    {"kind": "predict", "question": "With two resistors in series, is the current smaller in the second one?", "choices": ["Yes, the current gets used up", "No, the current is the same everywhere", "It depends on the battery"], "answer": 1, "why": "In a series circuit, the same current flows through every component."},
+    {"kind": "do", "instruction": "Tap each resistor to read the current through it.", "goals": [{"quantity": "current", "component": "R2", "min": 0.019, "max": 0.021}]},
+    {"kind": "observe", "question": "Compare the current in R1 and in R2. What do you notice?"}
+   ],
+   "takeaway": "The current is the same everywhere in a series circuit: it does not get used up. It is the voltage that is shared."}
+ ],
+ "challenges": [
+  {"id": "led20", "title": "Light the LED without burning it", "statement": "Choose the resistor so that the LED gets between 15 and 25 mA.", "preset": "led", "locked": ["B1"],
+   "goals": [{"quantity": "current", "component": "D1", "min": 0.015, "max": 0.025}, {"lit": "D1"}, {"not_burnt": true}],
+   "hint": "The LED takes about 2 V, which leaves 7 V for the resistor. With I = 0.02 A, what is R = U / I?"},
+  {"id": "find_r", "title": "Find the voltage", "statement": "Set the battery so that 30 mA flows through the 100 Ω resistor.", "preset": "ohm",
+   "goals": [{"quantity": "current", "component": "R1", "min": 0.0295, "max": 0.0305}],
+   "hint": "U = R × I = 100 × 0.03."}
+ ],
+ "quiz": [
+  {"question": "A current of 0.05 A flows through a 200 Ω resistor. What is the voltage across it?", "choices": ["4 V", "10 V", "40 V", "250 V"], "answer": 1, "explanation": "U = R × I = 200 × 0.05 = 10 V."},
+  {"question": "You increase a circuit's resistance without changing the battery. The current…", "choices": ["increases", "decreases", "does not change"], "answer": 1, "explanation": "I = U / R: if R goes up, I goes down."},
+  {"question": "Why do we put a resistor in series with an LED?", "choices": ["To make it brighter", "To limit the current so it does not burn out", "To change its colour"], "answer": 1, "explanation": "Without a resistor, the current goes beyond what the LED can take and it burns out."}
+ ]
+}

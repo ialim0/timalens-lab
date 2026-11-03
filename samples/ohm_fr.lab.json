@@ -1,0 +1,60 @@
+{
+ "version": 1,
+ "lab": "circuits",
+ "language": "fr",
+ "title": "La loi d'Ohm au laboratoire",
+ "level": "Collège, 3e",
+ "summary": "Dans un circuit, la tension U aux bornes d'une résistance est proportionnelle à l'intensité I du courant qui la traverse : U = R × I. La résistance R, en ohms, mesure à quel point un dipôle s'oppose au passage du courant.",
+ "objectives": [
+  "Mesurer la tension et l'intensité aux bornes d'une résistance",
+  "Tracer la caractéristique U = f(I) et reconnaître une droite qui passe par l'origine",
+  "Calculer une résistance à partir de mesures : R = U / I",
+  "Prévoir l'effet d'une résistance sur l'éclat d'une DEL"
+ ],
+ "formulas": [
+  {"text": "U = R × I", "meaning": "U en volts (V), R en ohms (Ω), I en ampères (A)"},
+  {"text": "R = U / I", "meaning": "la pente de la droite U = f(I) est la résistance"}
+ ],
+ "misconceptions": [
+  "Le courant s'use en traversant une résistance : en réalité, l'intensité est la même partout dans un circuit en série.",
+  "Une grande résistance laisse passer plus de courant : c'est l'inverse, à tension égale l'intensité diminue quand R augmente.",
+  "La pile fournit toujours le même courant : elle fournit une tension, le courant dépend du circuit."
+ ],
+ "presets": [
+  {"id": "ohm", "title": "Une résistance et ses appareils de mesure", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "R1", "type": "resistor", "R": 100}], "ammeter": true, "voltmeter_on": "R1"},
+  {"id": "led", "title": "Protéger une DEL", "topology": "series", "battery": {"V": 9},
+   "elements": [{"id": "R1", "type": "resistor", "R": 470}, {"id": "D1", "type": "led"}], "ammeter": true},
+  {"id": "two", "title": "Deux résistances en série", "topology": "series", "battery": {"V": 6},
+   "elements": [{"id": "R1", "type": "resistor", "R": 100}, {"id": "R2", "type": "resistor", "R": 200}], "ammeter": true, "voltmeter_on": "R2"}
+ ],
+ "activities": [
+  {"id": "discover", "title": "Découvrir la loi d'Ohm", "preset": "ohm",
+   "steps": [
+    {"kind": "predict", "question": "Si on double la tension de la pile, que devient l'intensité dans la résistance ?", "choices": ["Elle reste la même", "Elle double", "Elle diminue de moitié"], "answer": 1, "why": "U = R × I : à R fixe, I est proportionnelle à U."},
+    {"kind": "measure", "instruction": "Change la tension de la pile (touche la pile) et enregistre au moins 4 mesures de U et I avec le bouton « Enregistrer la mesure ».", "points": 4},
+    {"kind": "observe", "question": "Les points forment-ils une droite qui passe par l'origine ? Que vaut sa pente ?"}
+   ],
+   "takeaway": "U et I sont proportionnelles : la pente de la droite U = f(I) est la résistance, ici environ 100 Ω."},
+  {"id": "series", "title": "Le courant s'use-t-il ?", "preset": "two",
+   "steps": [
+    {"kind": "predict", "question": "Dans deux résistances en série, l'intensité est-elle plus faible dans la deuxième ?", "choices": ["Oui, le courant s'use", "Non, c'est la même intensité partout", "Cela dépend de la pile"], "answer": 1, "why": "Dans un circuit en série, le même courant traverse tous les dipôles."},
+    {"kind": "do", "instruction": "Déplace l'ampèremètre ou touche chaque résistance pour lire son intensité.", "goals": [{"quantity": "current", "component": "R2", "min": 0.019, "max": 0.021}]},
+    {"kind": "observe", "question": "Compare l'intensité dans R1 et dans R2. Que remarques-tu ?"}
+   ],
+   "takeaway": "L'intensité est la même partout dans un circuit en série : le courant ne s'use pas. C'est la tension qui se partage."}
+ ],
+ "challenges": [
+  {"id": "led20", "title": "Allume la DEL sans la griller", "statement": "Choisis la résistance pour que la DEL reçoive entre 15 et 25 mA.", "preset": "led", "locked": ["B1"],
+   "goals": [{"quantity": "current", "component": "D1", "min": 0.015, "max": 0.025}, {"lit": "D1"}, {"not_burnt": true}],
+   "hint": "La DEL prend environ 2 V : il reste 7 V pour la résistance. Avec I = 0,02 A, que vaut R = U / I ?"},
+  {"id": "find_r", "title": "Trouve la tension", "statement": "Règle la pile pour que 30 mA traversent la résistance de 100 Ω.", "preset": "ohm",
+   "goals": [{"quantity": "current", "component": "R1", "min": 0.0295, "max": 0.0305}],
+   "hint": "U = R × I = 100 × 0,03."}
+ ],
+ "quiz": [
+  {"question": "Une résistance de 200 Ω est traversée par un courant de 0,05 A. Quelle est la tension à ses bornes ?", "choices": ["4 V", "10 V", "40 V", "250 V"], "answer": 1, "explanation": "U = R × I = 200 × 0,05 = 10 V."},
+  {"question": "On augmente la résistance d'un circuit sans changer la pile. L'intensité…", "choices": ["augmente", "diminue", "ne change pas"], "answer": 1, "explanation": "I = U / R : si R augmente, I diminue."},
+  {"question": "Pourquoi met-on une résistance en série avec une DEL ?", "choices": ["Pour qu'elle éclaire plus", "Pour limiter le courant et ne pas la griller", "Pour changer sa couleur"], "answer": 1, "explanation": "Sans résistance, le courant dépasse ce que la DEL supporte et elle grille."}
+ ]
+}
