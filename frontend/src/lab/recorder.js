@@ -7,14 +7,35 @@ const FPS = 30;
 const MAX_WIDTH = 1920;
 const TYPES = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
 
-/** A muted <video> of a stream, to draw its frames on a canvas. It sits in the page, invisible
- *  (a detached video may never start), and nothing waits for it: frames are drawn once it has some. */
-function play(stream) {
-  const video = Object.assign(document.createElement("video"), { srcObject: stream, muted: true, playsInline: true, autoplay: true });
-  Object.assign(video.style, { position: "fixed", width: "2px", height: "2px", opacity: "0", pointerEvents: "none", left: "0", top: "0" });
+/** The latest frame of a stream's video, to draw on a canvas: { frame, width, height, stop() }.
+ *  Where the browser can (Chrome, Edge), frames are read straight from the track. A <video>
+ *  element is only the fallback: browsers pause muted, unseen videos to save power, which once
+ *  froze a whole recording on its first second. */
+function frames(stream) {
+  const track = stream.getVideoTracks()[0];
+  if (typeof MediaStreamTrackProcessor !== "undefined") {
+    const reader = new MediaStreamTrackProcessor({ track }).readable.getReader();
+    const latest = { frame: null, width: 0, height: 0, stop: () => { reader.cancel().catch(() => {}); latest.frame?.close(); } };
+    (async () => {
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        latest.frame?.close();
+        Object.assign(latest, { frame: value, width: value.displayWidth, height: value.displayHeight });
+      }
+    })().catch(() => {});
+    return latest;
+  }
+  const video = Object.assign(document.createElement("video"), { srcObject: stream, muted: true, playsInline: true });
+  Object.assign(video.style, { position: "fixed", left: "0", bottom: "0", width: "4px", height: "4px", opacity: "0.01", pointerEvents: "none" });
   document.body.append(video);
-  video.play().catch(() => {});
-  return video;
+  video.play().catch(() => {}); // play(), not autoplay: autoplaying muted videos are paused when unseen
+  return {
+    get frame() { return video.readyState >= 2 ? video : null; },
+    get width() { return video.videoWidth; },
+    get height() { return video.videoHeight; },
+    stop: () => video.remove(),
+  };
 }
 
 export class SessionRecorder {
@@ -36,9 +57,9 @@ export class SessionRecorder {
     this.ownFace = !shared && Boolean(this.face); // a camera we opened, we close
     this.mic = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).catch(() => null);
 
-    const screen = play(this.display);
-    const face = this.face ? play(this.face) : null;
-    this.videos = [screen, face].filter(Boolean);
+    const screen = frames(this.display);
+    const face = this.face ? frames(this.face) : null;
+    this.sources = [screen, face].filter(Boolean);
     const settings = this.display.getVideoTracks()[0].getSettings();
     const scale = Math.min(1, MAX_WIDTH / (settings.width || 1280));
     const canvas = Object.assign(document.createElement("canvas"), {
@@ -46,27 +67,32 @@ export class SessionRecorder {
     });
     const g = canvas.getContext("2d");
     const draw = () => { // the screen, then the student's face in a round inset at the bottom left
-      if (screen.readyState >= 2) g.drawImage(screen, 0, 0, canvas.width, canvas.height);
-      if (face?.videoWidth) {
+      // drawn every tick, whatever happens: a canvas left untouched sends no frames, and then the
+      // recorder writes nothing at all, not even the sound
+      if (screen.frame) g.drawImage(screen.frame, 0, 0, canvas.width, canvas.height);
+      else { g.fillStyle = "#0b1530"; g.fillRect(0, 0, canvas.width, canvas.height); }
+      if (face?.frame && face.width) {
         const r = Math.round(canvas.height * 0.14), cx = r + 24, cy = canvas.height - r - 24;
-        const side = Math.min(face.videoWidth, face.videoHeight);
+        const side = Math.min(face.width, face.height);
         g.save();
         g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip();
         g.translate(cx + r, cy - r); g.scale(-1, 1); // a mirror, as the student sees themselves
-        g.drawImage(face, (face.videoWidth - side) / 2, (face.videoHeight - side) / 2, side, side, 0, 0, 2 * r, 2 * r);
+        g.drawImage(face.frame, (face.width - side) / 2, (face.height - side) / 2, side, side, 0, 0, 2 * r, 2 * r);
         g.restore();
         g.lineWidth = 5; g.strokeStyle = "#3ad1ff";
         g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
       }
     };
-    this.timer = setInterval(draw, 1000 / FPS); // not requestAnimationFrame: it keeps drawing if the tab is busy
+    // each drawn picture is sent as a frame at once: not waiting for the browser to repaint the canvas
+    const picture = canvas.captureStream(0).getVideoTracks()[0];
+    this.timer = setInterval(() => { draw(); picture.requestFrame?.(); }, 1000 / FPS); // not requestAnimationFrame: it keeps going if the tab is busy
 
     this.audio = new AudioContext();
     const mix = this.audio.createMediaStreamDestination();
     for (const source of [this.display, this.mic]) {
       if (source?.getAudioTracks().length) this.audio.createMediaStreamSource(source).connect(mix);
     }
-    const stream = new MediaStream([...canvas.captureStream(FPS).getVideoTracks(), ...mix.stream.getAudioTracks()]);
+    const stream = new MediaStream([picture, ...mix.stream.getAudioTracks()]);
     this.type = TYPES.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
     this.chunks = [];
     this.recorder = new MediaRecorder(stream, { mimeType: this.type || undefined, videoBitsPerSecond: 5_000_000 });
@@ -82,7 +108,7 @@ export class SessionRecorder {
     return new Promise((done) => {
       this.recorder.onstop = () => {
         clearInterval(this.timer);
-        this.videos.forEach((video) => video.remove());
+        this.sources.forEach((source) => source.stop());
         for (const stream of [this.display, this.mic, this.ownFace ? this.face : null]) stream?.getTracks().forEach((track) => track.stop());
         this.audio.close();
         const type = this.recorder.mimeType || this.type || "video/webm";

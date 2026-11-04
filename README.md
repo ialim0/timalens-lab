@@ -1,243 +1,209 @@
-<p><img src="frontend/public/img/timalens-logo.png" alt="TimaLens" height="40"></p>
+<p align="center"><img src="frontend/public/img/timalens-logo.png" alt="TimaLens" height="44"></p>
 
-# TimaLens Lab
+<h1 align="center">TimaLens Lab</h1>
 
-[![CI](https://github.com/ialim0/timalens-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/ialim0/timalens-lab/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
-![Built with Meta Muse Spark](https://img.shields.io/badge/Meta-Muse%20Spark%201.3-0467DF)
+<p align="center"><b>Every student deserves a physics lab. Most never get one.</b><br>
+A lesson goes in. A living, voice-guided electric-circuits lab comes out, on any device, in a minute.</p>
 
-**From watching a lesson to experiencing it.** · [Lire en français](README.fr.md) · [Demo script](docs/DEMO.md)
+<p align="center">
+  <a href="https://lab.timalens.com"><b>Try it live: lab.timalens.com</b></a> ·
+  <a href="https://lab.timalens.com/teach">For teachers</a> ·
+  <a href="SUBMISSION.md">Hackathon submission</a> ·
+  <a href="README.fr.md">Français</a>
+</p>
 
-> Built for the Meta Global AI Developer Hackathon: see [SUBMISSION.md](SUBMISSION.md). **Live: https://lab.timalens.com** · teachers: [lab.timalens.com/teach](https://lab.timalens.com/teach)
+<p align="center">
+  <a href="https://github.com/ialim0/timalens-lab/actions/workflows/ci.yml"><img src="https://github.com/ialim0/timalens-lab/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/Meta-Muse%20Spark%20%C2%B7%20Voice%20%C2%B7%20Image-0467DF" alt="Meta models">
+  <img src="https://img.shields.io/badge/tests-27%20e2e%20%C2%B7%2043%20server%20%C2%B7%2025%20engine-34c759" alt="Tests">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT"></a>
+</p>
 
-| Tima tells the teacher what Muse Spark is doing, and thinking | Students build and experiment, Tima guides them by voice |
+<p align="center"><img src="docs/images/demo.gif" alt="TimaLens Lab: the camera flies onto the 3D bench, a resistor is dragged onto the circuit, a mission starts, and Tima answers a spoken question" width="880"></p>
+
+TimaLens Lab is a module developed by **TimaLens Ltd**. It turns a teacher's own lesson into an
+interactive laboratory that students can open anywhere, practise in at their own pace, and drive
+with their hands and voice, guided by **Tima**, a voice tutor built on Meta's Muse models.
+
+---
+
+## The problem
+
+In much of the world, and across most of Africa, **a physics lab is a privilege**. Many secondary
+schools have none. Universities that do have one share a few benches between hundreds of students,
+open them for a handful of supervised sessions a semester, and lock them the rest of the time.
+
+So students meet electricity on a blackboard. They copy a diagram, memorise `U = R × I`, and sit an
+exam about circuits they have never built. The few who reach a real bench have minutes, not hours,
+and no right to fail: the equipment is scarce, and **a wrong connection burns a component that may
+not be replaced this year**. Every broken multimeter, every blown LED, every bulb wired straight
+across a battery makes the lab poorer for the next class.
+
+What students lack is not intelligence. It is **practice**: the freedom to try, get it wrong, see
+why, and try again, outside class hours, at their own pace, without anyone's permission and
+without breaking anything.
+
+Generic simulators help, but they teach someone else's lesson, in someone else's words and
+notation. A teacher in Cotonou, Dakar or Kumasi has no way to turn *their* chapter into *their*
+students' lab.
+
+## What TimaLens Lab does
+
+**A teacher uploads a lesson** (a PDF, a Word or PowerPoint file, a photo of the blackboard, a
+recording of the class). Muse Spark reads it and designs a lab around it: the circuits, the guided
+experiments, the challenges, the quiz. A physics engine proves every challenge can be met. One link
+goes to the class, on WhatsApp if need be.
+
+**A student opens the link** and is in a lab: a real-feeling 3D bench, or a 2D schematic, where
+circuits behave as they do in life. Bulbs glow with the right brightness. LEDs burn out, with
+sparks, when the current is too high, and are repaired with a tap. Mistakes cost nothing, and
+teach everything.
+
+| A guided tour on first visit | Tima answers, and points at what she means |
 |---|---|
-| ![Tima narrates the generation](docs/images/tima-at-work.png) | ![Tima points at the bulbs she is talking about](docs/images/tima-points.png) |
-| ![The teacher's page](docs/images/home.png) | ![The 3D bench](docs/images/lab-3d.png) |
+| ![Tima's guided tour lights up each part of the lab](docs/images/tour.png) | ![Tima answers a spoken question and the bulbs she names glow](docs/images/tima-points.png) |
+| **While the lab is made, Tima reads Muse Spark's reasoning aloud** | **The teacher's page: one action** |
+| ![Tima narrates the generation](docs/images/tima-at-work.png) | ![The teacher's page](docs/images/teacher.png) |
 
-A teacher uploads a lesson on electric circuits: a PDF, a Word or PowerPoint file, a photo of the blackboard or a notebook page, or a recording of the class. A minute later they have an interactive lab to share with their students as a single link. In the lab, students:
+## Features
 
-- build real DC circuits and change them;
-- read the meters;
-- plot U(I);
-- solve challenges;
-- ask a tutor that knows the lesson and sees their circuit;
-- switch between the **2D schematic** and a **3D lab bench** with real-looking parts;
-- at the end, **download an MP4 video of their own lab** or save it as a link the teacher can replay.
+**For the teacher**
+- **Any lesson, any format:** PDF, DOCX, PPTX, text, a photo of the board or a notebook (Muse Spark vision), a recording of the class (Muse Voice Transcribe).
+- **A lab in about a minute, narrated live.** Tima tells the teacher what is really happening: the lesson she read, Muse Spark's reasoning as it designs, the problems the engine finds and fixes. The teacher can talk to her meanwhile; when the lab is ready, it opens by itself.
+- **Faithful to the lesson:** its notation (U or V), its level, its worked examples, the mistakes it warns about.
+- **A cover for every lab**, drawn by Muse Image.
+- **Local languages:** the lab's content in Wolof, Hausa, Yorùbá, Fɔngbè, Kiswahili or Bamanankan; the interface in French and English. A translation can change only the words: the engine re-checks that the physics did not move.
 
-The lab works on a low-end phone and survives a bad connection.
+**For the student**
+- **A lab as the front door**, with a spoken guided tour on first visit, and the other labs one tap away.
+- **Missions:** guided experiments (*predict → do → observe*), challenges the engine checks live, a quiz. Steps move on by themselves when the circuit meets their goal; measurements record themselves and draw `U(I)` as the student turns a dial.
+- **Drag-and-drop building** in 2D and 3D, with a glowing preview of where a part will land.
+- **An immersive 3D bench:** a floating table over a glowing floor, a camera fly-in, real resistor colour bands, glowing bulbs, smoke and sparks when a part burns, **WebXR on Meta Quest**.
+- **Hands, through the webcam**, on by default: point to aim (hold still on a button to click it), pinch to grab a part, open the hand to turn the bench, make a fist to talk to Tima. Tracking runs in the browser.
+- **Voice, everywhere:** say *"Hey Tima"*, ask, and reply without her name; talk over her and she listens.
+- **The whole session, filmed:** with the student's consent the lab records itself (the screen, the student's face, both voices) and hands over an MP4 at the end, ready for WhatsApp.
+- **Built for real conditions:** a static web app cached for good after the first visit, 3D and video code loaded only when used, and a tutor that falls back on the engine's own readings when the network drops.
 
-## Why it is different
+## How Muse Spark is engineered in
 
-PhET-style simulators are excellent, but generic: the same lab for every class. TimaLens Lab builds the lab **from the teacher's own lesson**. It keeps:
-
-- the lesson's notation (U or V) and its level;
-- its worked examples;
-- the mistakes it warns about.
-
-The tutor answers from that lesson, using the numbers of the student's own circuit.
-
-## How it works
+The founding rule: **the model configures the lab; it never computes the physics.** Every voltage,
+current and brightness a student sees comes from a deterministic engine. Muse Spark is used where
+it is irreplaceable (reading a lesson, designing pedagogy, explaining, conversing) and is boxed in
+everywhere else.
 
 ```
- lesson (PDF · DOCX · PPTX · photo · audio/video)
-   │  pypdf / python-docx / python-pptx
-   │  Muse Spark vision ........... photos, scanned PDFs
-   │  Muse Voice Transcribe ....... recorded lessons
-   ▼
- Muse Spark 1.3 (structured output) ── designs the lab as JSON:
-   │   presets, guided activities (predict → do/measure → observe),
-   │   challenges with goals, quiz, formulas, misconceptions
-   ▼
- the circuit engine checks it (frontend/src/lab/labcheck.js, run with Node)
-   │   lays out and solves every preset, and searches the controls the student
-   │   may touch to prove every challenge is achievable (and not already solved)
-   │   └── problems go back to Muse Spark in plain words (up to 3 rounds)
-   ▼
- the lab (the Next.js app, /lab): the same engine, in the browser
-   └── tutor: Muse Spark, grounded in the lesson + the solved circuit
-       voice questions: Muse Voice Transcribe · answers read aloud by the browser
+ lesson ─▶ Muse Spark vision / Muse Voice Transcribe ─▶ text
+        ─▶ Muse Spark on the Responses API
+             · structured output against a closed JSON Schema          (text.format)
+             · reasoning summaries streamed ─▶ Tima reads them aloud    (reasoning.summary)
+        ─▶ circuit engine: lays out, solves, and searches the student's controls
+             to PROVE each challenge is achievable and not already met
+             └─ problems go back to Muse Spark in plain words (up to 3 rounds)
+        ─▶ lab JSON ─▶ the same engine, in the student's browser
 ```
 
-## Tima, the voice guide
+- **A closed schema.** Decoding is constrained to the schema, so the schema *is* the contract: every object names its keys, forbids all others (`additionalProperties: false`), and lists the values it accepts. The first real run taught us why: with an open schema, the model invented keys until it hit the output limit, 555,386 characters of them. A test now checks the schema against every field of the hand-written labs.
+- **Generate, check, repair.** The engine is the referee. It solves every preset, then explores the controls a student may touch to prove each challenge can be won, and that none is already won at the start. What fails goes back to Muse Spark as plain sentences.
+- **Reasoning, made audible.** On the Responses API, Muse Spark streams summaries of its reasoning; each one becomes an event that Tima speaks to the teacher, in the teacher's language.
+- **Room to think, and recovery when it runs out.** Reasoning tokens count against the output budget, so the request leaves room for both; an answer cut short (`response.incomplete`) is designed again at lower effort instead of handing the engine half a lab.
+- **A grounded, seeing tutor.** Tima's answers come from the teacher's lesson plus the solved circuit (every value, every reading), plus **a picture of the student's bench** for Muse Spark's vision. She is Socratic: she never hands over a challenge's answer. Answers stream, and each finished sentence is spoken at once.
+- **Realtime ears, safely relayed.** The microphone streams through the server to Muse Voice Transcribe realtime (the key never reaches the browser), with endpointing and "Tima" as a recognition keyword.
+- **Fail fast, say why.** If Meta's API cannot be reached, calls give up in seconds and the teacher is told plainly, before uploading.
 
-Students who have never seen a lab need someone beside them. **Tima** is a glowing orb on the bench that talks:
+| Meta model | Role in TimaLens Lab |
+|---|---|
+| **Muse Spark 1.3** (or **Muse Wonder** via `DESIGN_MODEL`) | Designs the lab: Responses API, closed structured output, streamed reasoning summaries, repair loop |
+| **Muse Spark vision** | Reads photographed lessons; sees the student's bench when they ask Tima |
+| **Muse Spark** (Contributor mode via `TUTOR_MODEL`) | Tima the tutor: grounded in the lesson and the live circuit, streamed |
+| **Muse Voice Transcribe (realtime)** | Tima's ears: streaming transcription, endpointing, keyword biasing, FR/EN code-switching |
+| **Muse Voice Transcribe** | Recorded lessons to text |
+| **Muse Image** | Each lab's cover, drawn while the engine checks it |
+| **Muse Spark Open** (optional) | `PLANNER_BASE_URL` runs the designer and the tutor on open weights, on a school's own GPUs or a hosted partner |
 
-- **She explains.** One tap opens the lab, the camera flies down onto the bench, and Tima says what the lab is about and what its missions are. She reads each step aloud.
-- **She reacts** to what the circuit does: a bulb lighting up, a short circuit, a burnt LED, a challenge met (with confetti). If a student is stuck on a challenge, she offers its hint.
-- **She listens, live.** The microphone streams to **Muse Voice Transcribe realtime** (through the server, which keeps the key): the words appear as they are said, Meta detects the end of the sentence, and her name is a recognition keyword. Say **"Hey Tima"**, or tap the orb. After she answers, she keeps listening a few seconds, so the student can simply reply. Without a key, the browser's own recognition stands in.
-- **She answers as she thinks.** Muse Spark's answer streams in, and each finished sentence is spoken at once with **Voxtral** (Mistral's voice, when `MISTRAL_API_KEY` is set; else the browser's). The orb moves with her voice, and "Hey Tima" interrupts her.
-- **She sees.** Every question carries a picture of the bench, the 3D table or the schematic, to **Muse Spark's vision**, alongside the engine's numbers, so she can say what the student actually built. The **Look** button asks her what she sees and what to try next. While she talks about a part ("look at L1"), it glows on the bench.
-- **She never invents a number.** What she says about the circuit comes from the engine; answers come from the grounded tutor. She speaks with the browser's own voices, so she is free and works offline once the page is loaded. Mute her and her words stay as captions.
+Tima's spoken voice is Voxtral (Mistral), because Muse Voice Transcribe is speech-to-text only;
+without a key, the browser's voice speaks.
 
-**Every session filmed, then downloaded.** At the first tap the browser asks to share the lab's tab; from then on the session records itself in the browser (the screen, the student's face in a round inset, Tima's voice and the student's), and Finish hands over the MP4.
+## The engine
 
-**Hands, through the webcam, by default.** The lab begins by asking for the camera and the microphone together; hand tracking runs in the browser (MediaPipe; the video never leaves the computer): a cursor follows the index finger, a **pinch** grabs and drops parts, an **open hand** turns the 3D bench, a **fist** wakes Tima. Gestures become ordinary pointer events, so everything in the lab works by hand.
+`frontend/src/lab/circuit.js` is a deterministic DC solver, tested against hand-worked answers:
+modified nodal analysis, batteries with internal resistance, a piecewise LED model with iteration,
+bulbs with brightness and burnout, short-circuit detection. **The same file** runs in the student's
+browser, in the server's checker, on the 3D bench and in the video renderer: what the checker
+proved is exactly what the student gets.
 
-The bench is hands-on: **drag a part from the tray onto the bench**, in 2D or 3D; a glowing beam shows where it will land. Pick a placed part up to move it, or drop it off the bench to take it away; the circuit is re-solved the moment it leaves or lands. Measurements take themselves: change a value and each new reading becomes a point of the U(I) graph. On a **Meta Quest**, the **VR** button puts the bench in front of the student (WebXR).
+## Architecture
 
-## One engine, three views
+```
+frontend/          Next.js (React + TypeScript), exported as static files
+  src/app/         /  (opens a lab) · /lab · /teach · /replay
+  src/components/  the teacher's page, the lab's layout, the replay
+  src/lab/         circuit.js engine · labcheck.js checker · board.js 2D · bench3d.js 3D + WebXR
+                   tima.js + voice.js Tima · hands.js hand tracking · recorder.js session film
+                   tour.js guided tour · session.js event log · video.js log → MP4
+  e2e/             Playwright: the whole app in Chrome
+app/               FastAPI: lesson reading, the design loop, the tutor, Tima's realtime relay and voice
+infra/terraform/   Google Cloud Run, Secret Manager, a GCS volume, a custom domain
+samples/           hand-written labs (FR/EN) and a lesson PDF
+tests/             engine (Node) and server (pytest) suites
+```
 
-The 2D schematic, the 3D bench and the video are three renderings of **the same solved circuit**. None of them simulates anything on its own.
-
-- **2D** (`frontend/src/lab/board.js`): the French school symbols, with moving charges whose speed follows the current on a log scale.
-- **3D** (`frontend/src/lab/bench3d.js`, three.js, loaded only on demand):
-  - resistors wear their **real colour code**, computed from their value (470 Ω → yellow, violet, brown, gold);
-  - bulbs glow with the **engine's brightness**, P / P rated: dim in series, full in parallel;
-  - LEDs light only forward-biased, and burn out with smoke above their current limit;
-  - multimeters show the **computed reading** on their screen;
-  - the student turns the bench with a finger and taps a part to adjust it.
-
-  Muse Spark chooses the view that opens from the lesson: 3D for real apparatus and hands-on building, 2D for diagram work. The teacher can override it, and the student can always switch.
-- **Video** (`frontend/src/lab/video.js`).
-  - **Recording.** Every session is recorded as an event log of a few KB (`frontend/src/lab/session.js`): each circuit change (one per quarter second while a slider moves), each prediction, measurement, challenge met, tutor exchange and quiz answer.
-  - **Rendering.** The video is computed from that log frame by frame. Each frame re-solves the circuit with the same engine and draws it with the same 2D or 3D code, with captions, the live meter readings, the U(I) graph building up, and a final lab report.
-  - **Encoding.** Frames are encoded with WebCodecs to an H.264 MP4 that plays in WhatsApp. Browsers without WebCodecs fall back to MediaRecorder, and the server converts that recording to H.264 with ffmpeg.
-  - **Why from a log.** A replay is exact. A phone on 2G sends 5 KB instead of 10 MB. A teacher can re-render any student's lab in 2D or 3D from `/replay?session=…`.
-
-**The model configures the lab; it never computes the physics.** Every voltage, current and brightness comes from `frontend/src/lab/circuit.js`, a deterministic solver:
-
-- modified nodal analysis;
-- batteries with internal resistance;
-- a piecewise LED model with iteration;
-- bulbs with brightness and burnout;
-- short-circuit detection.
-
-The engine is tested against hand-worked answers. The same file runs in the student's browser and on the server's checker, so what the checker proved is exactly what the student gets.
-
-## Meta models used
-
-| Model | Where | What for |
-|---|---|---|
-| `muse-spark-1.3` or `muse-wonder-1.0` | `app/generate.py` | Designs the lab from the whole lesson on the **Responses API**: structured output (`text.format`), and **reasoning summaries streamed** so Tima reads Muse Spark's thinking aloud to the teacher while it works. Repairs the lab from the engine's feedback. |
-| `muse-spark-1.3` (vision) | `app/tutor.py` | Tima, the voice tutor: grounded in the lesson and the live, solved circuit, and looking at a picture of the student's bench. |
-| `muse-spark-1.3` (vision) | `app/meta.py` `read_pages` | Reads photographed or scanned lessons: blackboards, notebooks, textbook pages, including circuit diagrams. |
-| `muse-spark-1.3` | `app/generate.py` `translate_lab` | Translates a lab (French ⇄ English, or a lab's content into Wolof, Hausa, Yorùbá, Fɔngbè, Kiswahili, Bamanankan). The structure must come back identical (ids, values, goals, answer indexes) and the engine re-checks it, so a translation can never change the physics or move a quiz answer. |
-| `muse-voice-transcribe-1.0` (realtime) | `app/voice.py` `relay` | Tima's ears: streaming transcription with endpointing, and "Tima" as a keyword. |
-| `muse-voice-transcribe-1.0` | `app/meta.py` `transcribe` | Turns recorded lessons into text. |
-| `muse-image-1.0` | `app/meta.py` `draw` | Draws each lab's cover while the engine checks the lab. |
-
-**Open weights.** Set `PLANNER_BASE_URL` to point both the designer and the tutor at any OpenAI-compatible server, for example vLLM serving an open-weight Muse model. A school or ministry can then run the whole thing on its own hardware.
-
-## Built for African classrooms
-
-- **Light.** The web app is a static Next.js export: about 170 KB gzipped for the lab in 2D, React included, cached for good after the first visit. three.js loads only when a student opens the 3D view, and the MP4 muxer only when they make a video. A lab is a few KB of JSON, and so is a whole recorded session.
-- **Works offline once loaded.** The engine runs in the browser. With no connection, the tutor falls back on what the engine knows: the readings, U/I for each part, the challenge's hint and the lesson's formula.
-- **French and English.**
-  - Every page has a FR | EN switch. The choice is remembered, and the browser's language is the default.
-  - The sample labs exist in both languages, with the same structure.
-  - An English visitor who opens a French link gets the English version.
-  - A generated lab is translated once by Muse Spark, on request, then kept.
-  - The tutor answers in the student's language, whatever the lesson's.
-  - The video's captions are in the same language.
-- **Local languages.** The teacher can ask for the lab's content in Wolof, Hausa, Yorùbá, Fɔngbè, Kiswahili or Bamanankan; the interface stays in French or English.
-- **Shareable.** One link, with a WhatsApp button.
-- **Paper lessons count.** A photo of the blackboard is a valid upload.
-- **Retries are free.** The same lesson uploaded twice reuses its lab instead of calling the model again.
+One container serves everything: the API, the WebSocket for Tima's ears, and the web app.
 
 ## Quick start
 
-**With Docker** (nothing else to install):
-
 ```bash
-cp .env.example .env        # add MODEL_API_KEY from the Meta Model API dashboard; never commit it
-docker compose up --build   # http://localhost:8080
+git clone https://github.com/ialim0/timalens-lab && cd timalens-lab
+cp .env.example .env        # MODEL_API_KEY (Meta), MISTRAL_API_KEY (optional, Tima's voice)
+make install                # Python virtualenv + npm
+make dev                    # API on :8080, web app on http://localhost:3000
 ```
 
-**Without Docker** (Python 3.10+, Node 20+, ffmpeg):
+Or `docker compose up --build`, then http://localhost:8080. The sample labs work without any key.
+
+## Deploy
 
 ```bash
-make install                # the server (virtualenv) and the web app (npm)
-cp .env.example .env        # add MODEL_API_KEY (and MISTRAL_API_KEY for Tima's Voxtral voice)
-make dev                    # the API on :8080 and the web app on http://localhost:3000, hot reload
+export TF_VAR_model_api_key=... TF_VAR_mistral_api_key=...
+make deploy PROJECT=my-gcp-project REGION=us-central1 DOMAIN=lab.example.com
 ```
 
-`make serve` builds the web app and runs everything as in production on http://localhost:8080.
-
-The address opens a lab straight away (the bulbs, in 3D), with a short **guided tour by Tima** on a
-first visit (the **?** button replays it). The other labs are in the small menu at the bottom, with
-the way to the **teacher's page** (`/teach`), where a lesson becomes a lab.
-
-No key yet? The two hand-written sample labs work without one:
-
-- `/lab?lab=sample-ohm-en` (or `-fr`): Ohm's law and the LED, opens in 2D;
-- `/lab?lab=sample-lampes-en` (or `-fr`): bulbs in series and in parallel, and the junction rule, opens in 3D.
-
-Add `&lang=en` or `&lang=fr` to any page's address to choose the interface's language. To try
-an upload, use `samples/lecon_loi_ohm.pdf`, a 4e lesson on Ohm's law (rebuild it with
-`tools/make_sample_lesson.py`).
-
-## Deploy to the cloud
-
-The repo ships Terraform for **Google Cloud Run**: Artifact Registry, a versioned GCS bucket
-for the labs, Secret Manager for the key, a least-privilege service account. One command
-builds the image with Cloud Build and deploys it:
-
-```bash
-export TF_VAR_model_api_key=...
-make deploy PROJECT=my-gcp-project
-```
-
-See [infra/README.md](infra/README.md) for the settings, limits and costs. The image also runs
-unchanged on any container host: it listens on `$PORT` and stores its data in `/app/data`.
+Cloud Build makes the image, Terraform creates Cloud Run, Secret Manager entries for the keys, a
+versioned bucket for the labs, a least-privilege service account and the domain mapping. See
+[infra/README.md](infra/README.md).
 
 ## Configuration
-
-Settings are read from the environment (see [.env.example](.env.example)):
 
 | Variable | Purpose | Default |
 |---|---|---|
 | `MODEL_API_KEY` | Meta Model API key | — |
-| `META_BASE_URL` | Meta Model API base URL | `https://api.meta.ai/v1` |
-| `PLANNER_MODEL` | Model that designs the lab and tutors | `muse-spark-1.3` |
+| `MISTRAL_API_KEY` | Tima's voice (Voxtral); without it the browser speaks | — |
+| `PLANNER_MODEL` · `DESIGN_MODEL` · `TUTOR_MODEL` | Models for each job | `muse-spark-1.3` |
 | `PLANNER_EFFORT` | Reasoning effort for the design | `medium` |
-| `DESIGN_MODEL` | Model that designs the labs, e.g. `muse-wonder-1.0` | `PLANNER_MODEL` |
-| `TUTOR_MODEL` | Model that tutors, e.g. `muse-spark-1.3-contributor` | `PLANNER_MODEL` |
-| `ASR_MODEL` | Speech-to-text model | `muse-voice-transcribe-1.0` |
-| `PLANNER_BASE_URL`, `PLANNER_API_KEY` | Open-weight server (optional) | — |
-| `MISTRAL_API_KEY` | Tima's voice (Voxtral TTS); without it the browser's voice speaks | — |
-| `TTS_VOICE_FR`, `TTS_VOICE_EN` | Voxtral voice per language | picked automatically |
-| `DATA_DIR` | Where generated labs and saved sessions are stored | `./data` |
+| `IMAGE_MODEL` · `ASR_MODEL` | Cover drawing, transcription | `muse-image-1.0` · `muse-voice-transcribe-1.0` |
+| `PLANNER_BASE_URL` · `PLANNER_API_KEY` | An open-weight server instead (optional) | — |
+| `DATA_DIR` | Where labs and sessions are stored | `./data` |
 
-## Development
+## Quality
 
 ```bash
-make help            # every task
-make test            # engine, checker, sessions, video timeline (Node) + server (pytest, offline)
-make e2e             # the whole app in Chrome (Playwright): pages, drag and drop, Tima, replay
-make lint            # ruff + TypeScript + terraform fmt
-make check-samples   # run the lab checker on every sample
-node tools/check_lab.mjs path/to/lab.json   # check any lab file
+make test    # 25 engine tests (Node) + 43 server tests (pytest)
+make e2e     # 27 end-to-end tests in Chrome (Playwright)
+make lint    # ruff + TypeScript + terraform fmt
 ```
 
-No test needs a key or calls a model: the Python tests fake Muse Spark and Meta's realtime ears,
-and the end-to-end tests stand in for the tutor and the microphone. CI (GitHub Actions) runs all
-of them, builds and smoke-tests the Docker image, and validates the Terraform.
+No test calls a model or needs a key: the server tests stand in for Muse Spark, Muse Image and
+Meta's realtime ears with fakes shaped like the API's documented events; the end-to-end tests stand
+in for the microphone, the camera, the tab share and the tutor, and drive MediaPipe for real. CI
+runs all of it, then builds and smoke-tests the Docker image and validates the Terraform.
 
-## Project layout
+## Privacy and safety
 
-```
-app/          FastAPI server: Meta model calls, lesson reading, lab design loop, tutor, Tima's voice
-frontend/     the web app (Next.js, exported as static files the server serves)
-  src/app/    the pages: / (opens a lab), /lab (the student's lab), /teach (a lesson in, a lab out), /replay
-  src/components/  React: the teacher's page, the lab's layout, the replay
-  src/lab/    circuit.js (engine) · labcheck.js (checker) · board.js (2D) · bench3d.js (3D)
-              tima.js + voice.js (Tima) · session.js (event log) · video.js (frames → MP4) · lab.js (the bench)
-  e2e/        Playwright tests
-samples/      two hand-written labs, each in French and English, and a lesson PDF to upload
-tools/        check_lab.mjs (the checker as a CLI), make_sample_lesson.py
-tests/        Node and pytest suites
-infra/        Terraform for Google Cloud Run
-scripts/      deploy.sh
-docs/         DEMO.md, the 3-minute hackathon demo script
-```
+- API keys live on the server (Secret Manager in production); the browser never sees them.
+- Hand tracking runs in the browser; the webcam video never leaves the computer.
+- A session is filmed only after the student shares the tab, and the film stays in the browser until they download it.
+- See [SECURITY.md](SECURITY.md) to report a vulnerability.
 
-## Contributing
+## Contributing and license
 
 Contributions are welcome: read [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md). To report a vulnerability, see [SECURITY.md](SECURITY.md).
-
-## License
-
-[MIT](LICENSE).
+[Code of Conduct](CODE_OF_CONDUCT.md). © 2026 TimaLens Ltd, released under the [MIT License](LICENSE).

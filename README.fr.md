@@ -1,135 +1,88 @@
-<p><img src="frontend/public/img/timalens-logo.png" alt="TimaLens" height="40"></p>
+<p align="center"><img src="frontend/public/img/timalens-logo.png" alt="TimaLens" height="44"></p>
 
-# TimaLens Lab
+<h1 align="center">TimaLens Lab</h1>
 
-**D'une leçon qu'on regarde à une expérience qu'on vit.** · [Read in English](README.md)
+<p align="center"><b>Chaque élève mérite un laboratoire de physique. La plupart n'en verront jamais.</b><br>
+Un cours entre. Un laboratoire de circuits électriques, vivant et guidé à la voix, en sort, sur n'importe quel appareil, en une minute.</p>
 
-Un enseignant téléverse un cours sur les circuits électriques : un PDF, un fichier Word ou PowerPoint, une photo du tableau ou d'une page de cahier, ou l'enregistrement de la classe. Une minute plus tard, il obtient un laboratoire interactif à partager avec ses élèves par un simple lien. Dans le labo, les élèves :
+<p align="center">
+  <a href="https://lab.timalens.com"><b>Essayer en ligne : lab.timalens.com</b></a> ·
+  <a href="https://lab.timalens.com/teach">Pour les enseignants</a> ·
+  <a href="README.md">English</a>
+</p>
 
-- construisent de vrais circuits en courant continu et les modifient ;
-- lisent les appareils de mesure ;
-- tracent U(I) ;
-- relèvent des défis ;
-- posent leurs questions à un tuteur qui connaît le cours et voit leur circuit ;
-- passent du **schéma 2D** à une **paillasse 3D** aux composants réalistes ;
-- à la fin, **téléchargent la vidéo MP4 de leur propre labo**, ou la sauvegardent sous forme de lien que le professeur peut revoir.
+<p align="center"><img src="docs/images/demo.gif" alt="TimaLens Lab : la caméra plonge sur la paillasse 3D, une résistance est glissée sur le circuit, une mission démarre, et Tima répond à une question" width="880"></p>
 
-Le labo fonctionne sur un petit téléphone et résiste à une mauvaise connexion.
+TimaLens Lab est un module développé par **TimaLens Ltd**. Il transforme le cours d'un enseignant
+en un laboratoire interactif que les élèves ouvrent n'importe où, pratiquent à leur rythme, et
+pilotent avec leurs mains et leur voix, guidés par **Tima**, une tutrice vocale construite sur les
+modèles Muse de Meta.
 
-## Ce qui le rend différent
+---
 
-Les simulateurs comme PhET sont excellents, mais génériques : le même labo pour toutes les classes. TimaLens Lab construit le labo **à partir du cours de l'enseignant**. Il en garde :
+## Le problème
 
-- la notation (U ou V) et le niveau ;
-- les exemples travaillés ;
-- les erreurs contre lesquelles le cours met en garde.
+Dans une grande partie du monde, et dans la plupart des pays d'Afrique, **un laboratoire de
+physique est un privilège**. Beaucoup de lycées n'en ont pas. Les universités qui en ont un
+partagent quelques paillasses entre des centaines d'étudiants, les ouvrent pour une poignée de
+séances encadrées par semestre, et les ferment le reste du temps.
 
-Le tuteur répond à partir de ce cours, avec les valeurs du circuit de l'élève.
+Alors les élèves découvrent l'électricité au tableau. Ils recopient un schéma, apprennent
+`U = R × I` par cœur, et passent un examen sur des circuits qu'ils n'ont jamais montés. Ceux qui
+accèdent enfin à une vraie paillasse ont quelques minutes, pas des heures, et pas le droit à
+l'erreur : le matériel est rare, et **un mauvais branchement grille un composant qui ne sera peut-être
+pas remplacé cette année**. Chaque multimètre cassé, chaque DEL grillée, chaque lampe branchée en
+court-circuit appauvrit le labo pour la classe suivante.
 
-## Comment ça marche
+Ce qui manque aux élèves, ce n'est pas l'intelligence. C'est **la pratique** : la liberté
+d'essayer, de se tromper, de comprendre pourquoi, et de recommencer, en dehors des heures de cours,
+à leur rythme, sans autorisation et sans rien casser.
 
-1. **Muse Spark lit tout le cours.** Les photos et les PDF scannés passent par la vision de Muse Spark ; les cours enregistrés, par Muse Voice Transcribe.
-2. **Muse Spark écrit le labo en JSON structuré :**
-   - circuits de départ ;
-   - expériences guidées (prédis → teste/mesure → observe) ;
-   - défis avec objectifs ;
-   - quiz, formules, erreurs fréquentes ;
-   - vue 2D ou 3D.
-3. **Le moteur de circuits vérifie tout** (`frontend/src/lab/labcheck.js`). Il résout chaque circuit et explore les réglages que l'élève peut toucher, pour prouver que chaque défi est faisable sans être déjà réussi au départ. Chaque problème repart vers Muse Spark en mots simples, jusqu'à 3 fois.
-4. **L'élève expérimente.** Le même moteur tourne dans son navigateur.
+## Ce que fait TimaLens Lab
 
-**L'IA configure le labo ; elle ne calcule jamais la physique.** Chaque tension, intensité et éclat vient de `frontend/src/lab/circuit.js`, un solveur déterministe :
+**L'enseignant téléverse un cours** (PDF, Word, PowerPoint, photo du tableau, enregistrement de la
+classe). Muse Spark le lit et conçoit un labo autour : circuits, expériences guidées, défis, quiz.
+Un moteur physique prouve que chaque défi est faisable. Un lien part à la classe, par WhatsApp s'il
+le faut.
 
-- analyse nodale modifiée ;
-- piles avec résistance interne ;
-- modèle de DEL par morceaux ;
-- lampes avec éclat et claquage ;
-- détection des courts-circuits.
+**L'élève ouvre le lien** et se retrouve dans un labo : une paillasse 3D réaliste, ou un schéma 2D,
+où les circuits se comportent comme dans la vie. Les lampes brillent avec le bon éclat. Les DEL
+grillent, avec des étincelles, quand le courant est trop fort, et se réparent d'un geste. Les erreurs
+ne coûtent rien, et apprennent tout.
 
-## Un moteur, trois vues
+## Les fonctionnalités
 
-- **2D** : les symboles de l'école française, avec des charges dont la vitesse suit l'intensité.
-- **3D** (three.js, chargé seulement si l'élève le demande) :
-  - les résistances portent leur vrai code couleur ;
-  - les lampes brillent selon la puissance calculée, faiblement en série et à plein en dérivation ;
-  - une DEL qui grille devient noire et fume ;
-  - les multimètres affichent la valeur calculée.
+- **Tout cours, tout format**, lu par Muse Spark (vision pour les photos) et Muse Voice Transcribe (enregistrements).
+- **Un labo en une minute, raconté en direct** : Tima lit à voix haute le raisonnement de Muse Spark pendant qu'il conçoit, répond aux questions de l'enseignant, et ouvre le labo quand il est prêt.
+- **Une couverture pour chaque labo**, dessinée par Muse Image.
+- **Une visite guidée parlée** à la première visite, et des **missions** qui avancent seules quand le circuit atteint l'objectif.
+- **Construction par glisser-déposer** en 2D et en 3D, paillasse immersive, **WebXR sur Meta Quest**.
+- **Les mains, par la webcam**, actives par défaut : viser, rester sur un bouton pour cliquer, pincer pour attraper, ouvrir la main pour tourner, fermer le poing pour parler à Tima. Le suivi tourne dans le navigateur.
+- **La voix, partout** : « Hey Tima », réponses sans répéter son nom, interruption naturelle.
+- **Toute la séance filmée**, avec l'accord de l'élève : l'écran, son visage et les voix, en MP4 à télécharger à la fin.
+- **Pensé pour le terrain** : application statique mise en cache, 3D et vidéo chargées à la demande, tuteur de secours hors ligne. Contenu en wolof, haoussa, yorùbá, fɔngbè, kiswahili, bamanankan.
 
-  Muse Spark choisit la vue d'ouverture selon le cours ; le professeur peut l'imposer et l'élève peut toujours changer.
-- **Vidéo** : chaque séance est enregistrée comme un journal de quelques Ko. La vidéo est recalculée image par image à partir de ce journal, avec le même moteur et le même dessin, puis encodée en MP4 H.264 (WebCodecs), prête pour WhatsApp. Le rejeu est exact, un élève en 2G envoie 5 Ko au lieu de 10 Mo, et le professeur peut regénérer la vidéo de n'importe quel élève (`/replay?session=…`).
+## L'ingénierie autour de Muse Spark
 
-## Modèles Meta utilisés
+La règle fondatrice : **le modèle configure le labo, il ne calcule jamais la physique.** Chaque
+tension, intensité et éclat vient d'un moteur déterministe (analyse nodale modifiée, modèle de DEL,
+lampes avec éclat et claquage), le même fichier dans le navigateur, le vérificateur du serveur, la
+paillasse 3D et la vidéo.
 
-| Modèle | Rôle |
-|---|---|
-| `muse-spark-1.3` | Conçoit le labo à partir du cours (sortie structurée) et le corrige d'après le moteur. |
-| `muse-spark-1.3` | Tuteur socratique, ancré dans le cours et dans le circuit résolu. Il répond dans la langue de l'élève. |
-| `muse-spark-1.3` (vision) | Lit les cours photographiés ou scannés : tableau, cahier, manuel, schémas de circuits. |
-| `muse-spark-1.3` | Traduit un labo (français ⇄ anglais, ou son contenu en wolof, haoussa, yorùbá, fɔngbè, kiswahili, bamanankan). La structure doit revenir identique et le moteur la revérifie : une traduction ne peut ni changer la physique, ni déplacer une bonne réponse. |
-| `muse-voice-transcribe-1.0` | Transcrit les cours enregistrés et les questions orales. |
+- **Un schéma fermé** : la sortie structurée suit exactement le schéma, chaque objet nomme ses clés et interdit les autres.
+- **Générer, vérifier, réparer** : le moteur résout chaque circuit et prouve que chaque défi est faisable sans être déjà réussi ; les problèmes repartent vers Muse Spark en mots simples.
+- **Le raisonnement rendu audible** : les résumés de raisonnement de l'API Responses sont lus par Tima à l'enseignant.
+- **Une tutrice ancrée et qui voit** : le cours, le circuit résolu, et une image du banc de l'élève pour la vision de Muse Spark.
+- **Des oreilles en temps réel** : le micro passe par le serveur vers Muse Voice Transcribe ; la clé ne quitte jamais le serveur.
 
-**Poids ouverts.** `PLANNER_BASE_URL` fait passer la conception et le tuteur par n'importe quel serveur compatible OpenAI, par exemple vLLM avec un modèle Muse à poids ouverts. Une école ou un ministère peut ainsi tout héberger chez lui.
-
-## Pensé pour les classes africaines
-
-- **Léger.** Environ 45 Ko compressés de JS, CSS et SVG, sans framework. La 3D (environ 195 Ko) ne se charge que sur demande.
-- **Fonctionne hors ligne une fois chargé.** Sans connexion, le tuteur répond avec ce que sait le moteur.
-- **Français et anglais.**
-  - Chaque page a un sélecteur FR | EN, mémorisé ; la langue du navigateur sert par défaut.
-  - Les labos d'exemple existent dans les deux langues.
-  - Un lien français ouvert par un anglophone s'ouvre en anglais.
-  - Un labo généré se traduit une fois par Muse Spark, puis reste disponible.
-- **Langues locales** pour le contenu du labo.
-- **Partageable** par un lien ou WhatsApp. **Un cours papier compte** : la photo du tableau suffit.
-
-## Lancer le projet
-
-**Avec Docker** (rien d'autre à installer) :
+## Démarrer
 
 ```bash
-cp .env.example .env        # y mettre MODEL_API_KEY (clé de la Meta Model API) — ne jamais la commiter
-docker compose up --build   # http://localhost:8080
+cp .env.example .env        # MODEL_API_KEY (Meta), MISTRAL_API_KEY (optionnel)
+make install && make dev    # l'app sur http://localhost:3000
 ```
 
-**Sans Docker** (Python 3.10+, Node 20+, ffmpeg) :
+Déploiement : `make deploy PROJECT=… DOMAIN=…` (voir [infra/README.md](infra/README.md)).
+Tests : `make test` et `make e2e`.
 
-```bash
-make install
-cp .env.example .env        # y mettre MODEL_API_KEY
-make dev                    # l'API sur :8080 et l'app sur http://localhost:3000
-```
-
-Exemples sans clé :
-
-- `/lab?lab=sample-ohm-fr` (ou `-en`) : la loi d'Ohm et la DEL, en 2D ;
-- `/lab?lab=sample-lampes-fr` (ou `-en`) : lampes en série et en dérivation, en 3D.
-
-Ajoute `&lang=fr` ou `&lang=en` à l'adresse pour choisir la langue de l'interface.
-
-## Déployer dans le cloud
-
-Le dépôt contient le Terraform pour **Google Cloud Run** (registre d'images, bucket GCS pour
-les labos, Secret Manager pour la clé). Une seule commande construit l'image et la déploie :
-
-```bash
-export TF_VAR_model_api_key=...
-make deploy PROJECT=mon-projet-gcp
-```
-
-Détails, limites et coûts : [infra/README.md](infra/README.md).
-
-## Tests
-
-```bash
-make test    # moteur, vérificateur, séances, vidéo (Node) + serveur, tuteur, traduction (pytest, hors ligne)
-make lint    # ruff + terraform fmt
-```
-
-## Contribuer
-
-Les contributions sont les bienvenues : voir [CONTRIBUTING.md](CONTRIBUTING.md) et le
-[code de conduite](CODE_OF_CONDUCT.md).
-
-## Licence
-
-[MIT](LICENSE).
+© 2026 TimaLens Ltd · [Licence MIT](LICENSE)

@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "description": "TimaLens Lab's web app: the teacher's page, the student's lab and the replay, as a static Next.js export served by the FastAPI server.",
+  "author": "TimaLens Ltd",
+  "license": "MIT",
   "scripts": {
     "predev": "node scripts/fetch-hands.mjs",
     "dev": "next dev --port 3000",

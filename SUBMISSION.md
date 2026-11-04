@@ -1,15 +1,24 @@
 # TimaLens Lab · Meta Global AI Developer Hackathon
 
-**Track:** Indie developer · **Theme:** Build for Your World
+**Track:** Indie developer · **Theme:** Build for Your World · **By:** TimaLens Ltd
 
-> From watching a lesson to experiencing it.
+> Every student deserves a physics lab. Most never get one.
 
-## The problem I know firsthand
+![TimaLens Lab in action](docs/images/demo.gif)
+
+## The problem we know firsthand
 
 I taught mathematics in a village in Benin with no electricity. My students learned about
 circuits from a blackboard drawing: they had never closed a switch and watched a bulb light.
-Most schools in Africa have no physics lab, and the generic simulators that exist teach someone
-else's lesson, in someone else's words.
+
+Across most of Africa, a physics lab is a privilege. Many schools have none; universities that do
+share a few benches between hundreds of students, for a handful of supervised sessions a semester.
+Students who finally reach a bench have minutes and no right to fail: equipment is scarce, and a
+wrong connection burns a component that may not be replaced this year. What they lack is practice:
+the freedom to try, fail, understand and try again, outside class, at their own pace, without
+breaking anything. Generic simulators teach someone else's lesson, in someone else's words.
+
+TimaLens Lab is a module by **TimaLens Ltd** that turns a teacher's own lesson into that lab.
 
 ## What TimaLens Lab does
 
@@ -43,6 +52,8 @@ as one link (or on WhatsApp), that works on a $50 phone.
 - **The AI never computes the physics.** A deterministic circuit engine (modified nodal
   analysis) solves every circuit and **proves every challenge can be met** before a student sees
   it. Anything wrong goes back to Muse Spark in plain words.
+- **Mistakes cost nothing.** A burnt LED sparks, smokes, and is repaired with a tap: the lesson
+  a real bench teaches by destroying a component, without the cost.
 
 ## Meta models, and what each one does
 
@@ -66,7 +77,9 @@ without a key, the browser's own voice speaks.
   bulbs with brightness and burnout, short-circuit detection, tested against hand-worked answers.
 - An **achievability search** that proves every challenge is solvable with the controls the
   student may touch, and rejects challenges already solved.
-- A **generate → check → repair loop** with Muse Spark, narrated live.
+- A **generate → check → repair loop** with Muse Spark, narrated live, against a **closed JSON
+  Schema** (every object names its keys and forbids others: an open schema once let the model
+  invent keys for 555,386 characters), with recovery when an answer is cut short by the output limit.
 - **Tima**: realtime ears relayed through the server (the key never reaches the browser), a
   wake word robust to recogniser spellings and to her own voice, streamed answers spoken while
   they are written, follow-up replies without her name, barge-in.
@@ -74,7 +87,10 @@ without a key, the browser's own voice speaks.
   frame by the same engine (WebCodecs), so a teacher on 2G can receive a student's lab.
 - **Built to ship**: Next.js static export served by FastAPI in one container, Terraform for
   Google Cloud Run (Secret Manager, a least-privilege service account, a GCS volume), GitHub
-  Actions running **25 end-to-end tests in Chrome** (hand tracking and the guided tour included), 37 server tests and 25 engine tests.
+  Actions running **27 end-to-end tests in Chrome** (hand tracking, the guided tour and session
+  filming included), 43 server tests and 25 engine tests. Every Meta call was run for real on the
+  deployed app: reasoning summaries, a complete lab checked by the engine, Muse Image's cover,
+  realtime transcription.
 - **Hands as a pointer**: gestures (pinch, open hand, fist) classified from MediaPipe's 21 landmarks,
   scale-invariant, with hysteresis; they become the same pointer events a mouse makes, so every
   interaction of the lab works by hand without a second code path.

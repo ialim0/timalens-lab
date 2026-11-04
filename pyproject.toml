@@ -5,7 +5,7 @@ description = "Upload any lesson, get an interactive electric-circuits lab: Meta
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-authors = [{ name = "TimaLens Lab contributors" }]
+authors = [{ name = "TimaLens Ltd" }]
 keywords = ["education", "physics", "electric-circuits", "simulation", "meta-ai", "llm", "edtech"]
 classifiers = [
   "Programming Language :: Python :: 3",
