@@ -27,6 +27,16 @@ and pushes the image tagged with the git commit, then applies the rest. It print
 Redeploy after a code change with the same command. Tear down with `make destroy PROJECT=…`
 (the data bucket refuses to be deleted while it holds labs: empty it first if you mean it).
 
+## A custom domain
+
+```bash
+make deploy PROJECT=my-gcp-project DOMAIN=lab.example.com
+```
+
+The parent domain must be verified for your Google account (Search Console). The deploy prints
+the DNS record to add at your DNS host (for a subdomain: `CNAME lab -> ghs.googlehosted.com.`);
+Google then issues and renews the HTTPS certificate on its own, in 15 minutes to an hour.
+
 ## Settings
 
 Copy `terraform/terraform.tfvars.example` to `terraform.tfvars` (git-ignored) for anything

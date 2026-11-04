@@ -81,7 +81,7 @@ down: ## Stop the Docker Compose stack
 .PHONY: deploy
 deploy: ## Deploy to Cloud Run: make deploy PROJECT=<gcp-project> [REGION=europe-west1]
 	@[ -n "$(PROJECT)" ] || { echo "usage: make deploy PROJECT=<gcp-project-id>"; exit 1; }
-	scripts/deploy.sh $(PROJECT) $(REGION)
+	DOMAIN=$(DOMAIN) scripts/deploy.sh $(PROJECT) $(REGION)
 
 .PHONY: destroy
 destroy: ## Tear the Cloud Run deployment down (the data bucket is kept unless emptied)

@@ -4,6 +4,7 @@
 #
 #   export TF_VAR_model_api_key=...      # Meta Model API key
 #   scripts/deploy.sh <gcp-project-id> [region]
+#   DOMAIN=lab.example.com scripts/deploy.sh ...   # optional custom domain
 set -euo pipefail
 
 PROJECT="${1:?usage: scripts/deploy.sh <gcp-project-id> [region]}"
@@ -11,7 +12,7 @@ REGION="${2:-europe-west1}"
 TAG="${TAG:-$(git rev-parse --short HEAD 2>/dev/null || date +%s)}"
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TF=(terraform -chdir="$ROOT/infra/terraform")
-VARS=(-var "project_id=$PROJECT" -var "region=$REGION")
+VARS=(-var "project_id=$PROJECT" -var "region=$REGION" -var "domain=${DOMAIN:-}")
 
 : "${TF_VAR_model_api_key:?set TF_VAR_model_api_key to your Meta Model API key}"
 command -v gcloud >/dev/null || { echo "gcloud is required: https://cloud.google.com/sdk/docs/install" >&2; exit 1; }
@@ -39,3 +40,7 @@ echo "==> 3/3 Cloud Run, bucket, secret"
 
 echo
 echo "TimaLens Lab is live at: $("${TF[@]}" output -raw url)"
+if [ -n "${DOMAIN:-}" ]; then
+  echo "For https://$DOMAIN, add at your DNS host:"
+  "${TF[@]}" output -json dns_records
+fi

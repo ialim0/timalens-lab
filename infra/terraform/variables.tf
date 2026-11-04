@@ -74,3 +74,9 @@ variable "labels" {
   type        = map(string)
   default     = { app = "timalens-lab" }
 }
+
+variable "domain" {
+  description = "Optional custom domain for the app (e.g. lab.timalens.com). Its parent domain must be verified for your Google account; then add the DNS records from the dns_records output at your DNS host."
+  type        = string
+  default     = ""
+}

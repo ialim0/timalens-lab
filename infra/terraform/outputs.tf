@@ -12,3 +12,8 @@ output "data_bucket" {
   description = "Bucket holding generated labs and saved sessions."
   value       = google_storage_bucket.data.name
 }
+
+output "dns_records" {
+  description = "The DNS records to add at your DNS host for the custom domain (empty without one)."
+  value       = var.domain == "" ? [] : [for r in google_cloud_run_domain_mapping.app[0].status[0].resource_records : "${r.type} ${r.name} -> ${r.rrdata}"]
+}

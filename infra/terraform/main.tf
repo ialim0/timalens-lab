@@ -239,3 +239,20 @@ resource "google_cloud_run_v2_service_iam_member" "public" {
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
+
+# ---------------------------------------------------------------- a custom domain (optional)
+# Google issues and renews the HTTPS certificate once the DNS records point here.
+resource "google_cloud_run_domain_mapping" "app" {
+  count    = var.domain == "" ? 0 : 1
+  name     = var.domain
+  location = var.region
+
+  metadata {
+    namespace = var.project_id
+    labels    = var.labels
+  }
+
+  spec {
+    route_name = google_cloud_run_v2_service.app.name
+  }
+}
