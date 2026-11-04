@@ -330,6 +330,7 @@ def test_without_a_voice_key_the_browser_speaks(monkeypatch):
 
 
 def test_tima_speaks_with_voxtral(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
     async def speak(cfg, text, language):
         return b"ID3-mp3:" + text.encode()
 
@@ -448,3 +449,14 @@ def test_an_unreachable_meta_is_said_plainly(monkeypatch):
     assert client.get("/api/health").json()["meta_reachable"] is False
     r = client.post("/api/labs/sample-ohm-en/tutor", json={"question": "?"})
     assert r.status_code == 503 and "cannot be reached from this network" in r.json()["detail"]
+
+
+def test_a_sentence_voxtral_refuses_is_a_one_off(monkeypatch):
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-key")
+
+    async def speak(cfg, text, language):
+        raise voice.VoiceError("Voxtral TTS answered 403")
+
+    monkeypatch.setattr(voice, "speak", speak)
+    r = TestClient(server.app).post("/api/tts", json={"text": "Bonjour"})
+    assert r.status_code == 502  # not 503: the browser keeps Voxtral for the next sentences

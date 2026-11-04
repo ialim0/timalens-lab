@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+import httpx
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -361,14 +362,17 @@ class SpeakRequest(BaseModel):
 
 @app.post("/api/tts")
 async def tts(body: SpeakRequest) -> Response:
-    """One sentence of Tima's, spoken by Voxtral. 503 tells the browser to use its own voice."""
+    """One sentence of Tima's, spoken by Voxtral. 503: no voice here, the browser speaks from now on;
+    502: Voxtral refused this sentence, the browser says just this one."""
     text = body.text.strip()[:600]
     if not text:
         raise HTTPException(400, "nothing to say")
+    if not settings().tts_api_key:
+        raise HTTPException(503, "MISTRAL_API_KEY is not set: the browser's voice speaks instead")
     try:
         audio = await voice.speak(settings(), text, body.language)
-    except voice.VoiceError as exc:
-        raise HTTPException(503, str(exc)) from exc
+    except (voice.VoiceError, httpx.HTTPError) as exc:
+        raise HTTPException(502, str(exc)[:200]) from exc
     return Response(audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
 

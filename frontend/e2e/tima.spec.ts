@@ -67,6 +67,6 @@ test.describe("Tima, the voice guide", () => {
     await page.getByRole("tab", { name: "Tima" }).click();
     await page.locator("#question").fill("what is happening?");
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(page.locator("#chat .msg.ai").last()).toContainText("I'm offline");
+    await expect(page.locator("#chat .msg.ai").last()).toContainText("I can't reach Muse Spark right now");
   });
 });

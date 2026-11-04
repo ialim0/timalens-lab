@@ -108,20 +108,23 @@ export class Mouth {
   /** Ask for a sentence's audio now, so it is ready when its turn comes. */
   prefetch(text) {
     if (!this.serverVoice || this.cache.has(text)) return;
+    // resolves to the audio, or to null when Voxtral could not say it (never rejects: it may be dropped unheard)
     this.cache.set(text, fetch("/api/tts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ text, language: this.lang }) })
-      .then((r) => { if (r.status === 503) this.serverVoice = false; if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); }));
+      .then((r) => {
+        if (r.status === 503) this.serverVoice = false; // the server has no voice: the browser speaks from now on
+        return r.ok ? r.arrayBuffer() : null; // one refused sentence: the browser says just that one
+      })
+      .catch(() => null));
   }
 
   /** Speak one sentence; resolves when it has been said (or stopped). */
   async speak(text) {
     if (this.serverVoice) {
       this.prefetch(text);
-      try {
-        const bytes = await this.cache.get(text);
-        this.cache.delete(text);
-        return await this.play(bytes);
-      } catch {
-        this.cache.delete(text); // Voxtral unreachable: the browser says it instead
+      const bytes = await this.cache.get(text);
+      this.cache.delete(text);
+      if (bytes) {
+        try { return await this.play(bytes); } catch { /* undecodable: the browser says it instead */ }
       }
     }
     return this.speakInBrowser(text);
