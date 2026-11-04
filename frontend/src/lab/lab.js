@@ -1,11 +1,16 @@
 // TimaLens Lab: the student's bench. The circuit is solved by circuit.js on every change;
-// nothing here guesses at physics. The panel guides the student (predict, do, measure,
-// observe), checks challenges against the solved circuit, keeps a measurement log with its
-// U(I) graph, runs the quiz, and talks to the tutor (Muse Spark, through the server).
+// nothing here guesses at physics. Parts are dragged onto the bench (2D or 3D); Tima, the
+// voice guide, explains each mission and reacts to what the circuit does; the panel lists
+// the missions (guided activities and challenges), takes measurements on its own and draws
+// their U(I) graph, runs the quiz, and talks to the tutor (Muse Spark, through the server).
+//
+// It drives the DOM that the Next.js page renders (components/LabView.tsx): import it once that
+// markup is on the page, then call mountLab().
 import { TYPES, format, layout, meets, normalise, solve } from "./circuit.js";
-import { boardSvg, chargeAt, chargePaths, px, symbol } from "./board.js";
+import { CELL, PAD, boardSvg, chargeAt, chargePaths, nearestEdge, px, standaloneSvg, symbol, view as boardView } from "./board.js";
 import { mountLanguageSwitch, strings, uiLanguage } from "./i18n.js";
 import { Session } from "./session.js";
+import { Tima, lines } from "./tima.js";
 
 const E12 = [1, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2];
 const SERIES = (min, max) => [1, 10, 100, 1000].flatMap((d) => E12.map((m) => Math.round(m * d * 10) / 10)).filter((v) => v >= min && v <= max);
@@ -18,8 +23,10 @@ const state = {
   lab: null, labId: null, t: strings("fr"), components: [], solution: null, selected: null, tool: "select",
   electrons: false, preset: null, locked: [], mode: { kind: "free" }, tab: "guide",
   log: { rows: [], target: null }, predicted: {}, quiz: {}, chat: [], done: new Set(), hover: null, view: "2d",
+  finished: new Set(), announced: new Set(), shorted: false, quiet: false, frozenView: null, spot: [],
 };
 let bench3d = null; // the 3D bench, loaded on first use
+let tima = null, voice = lines("fr"); // the voice guide, and what she says
 
 // ---------------------------------------------------------------- loading
 async function fetchLab(id) {
@@ -43,7 +50,7 @@ async function loadLab() {
       history.replaceState(null, "", `?${params}`);
     }
   } catch {
-    lab = await (await fetch(`samples/ohm_${state.ui}.lab.json`)).json(); // served statically, without the server
+    lab = await (await fetch(`/samples/ohm_${state.ui}.lab.json`)).json(); // served statically, without the API
     lab.origin = "sample";
   }
   state.lab = lab;
@@ -54,6 +61,7 @@ async function loadLab() {
   document.title = `${lab.title} · TimaLens Lab`;
   $("#lab-title").textContent = lab.title;
   $("#lab-origin").textContent = lab.origin === "sample" ? state.t.sample : state.t.generated;
+  $("#lab-origin").classList.toggle("ai", lab.origin !== "sample");
   $("#electrons-label").textContent = state.t.electrons;
   $("#hint").textContent = state.t.place_hint;
   $("#finish").textContent = state.t.finish;
@@ -61,8 +69,14 @@ async function loadLab() {
   buildToolbar();
   buildTabs();
   usePreset(lab.presets[0].id);
-  if (params.get("view") === "3d" || (lab.view === "3d" && params.get("view") !== "2d")) setView("3d");
+  await setUpTima();
+  const asked = params.get("view");
+  if (asked === "3d" || (asked !== "2d" && (lab.view === "3d" || immersiveDevice()))) await setView("3d");
+  showIntro();
+  navigator.xr?.isSessionSupported?.("immersive-vr").then((ok) => { $("#vr").hidden = !ok; }).catch(() => {});
 }
+/** A computer with room and power for the 3D world opens in it; a small phone opens in 2D. */
+const immersiveDevice = () => matchMedia("(min-width: 900px)").matches && (navigator.hardwareConcurrency ?? 4) > 4;
 
 function usePreset(id, locked = []) {
   const preset = state.lab.presets.find((p) => p.id === id) ?? state.lab.presets[0];
@@ -72,26 +86,32 @@ function usePreset(id, locked = []) {
   state.selected = null;
   const first = state.components.find((c) => ["resistor", "bulb", "led"].includes(c.type));
   state.log.target = first?.id ?? null;
+  state.announced = new Set();
+  state.quiet = true; // a fresh circuit is not news: Tima only remarks on what the student changes
   recompute();
+  state.quiet = false;
 }
 
 // ---------------------------------------------------------------- physics, on every change
 function recompute() {
   state.solution = solve(state.components);
-  for (const c of state.components) if (state.solution.components[c.id]?.burntNow) c.burnt = true;
-  if (Object.values(state.solution.components).some((r) => r.burntNow)) state.solution = solve(state.components);
+  const burntNow = state.components.filter((c) => state.solution.components[c.id]?.burntNow);
+  for (const c of burntNow) c.burnt = true;
+  if (burntNow.length) state.solution = solve(state.components);
   state.session?.circuit(state.components);
   drawBoard();
   drawInspector();
   refreshPanel(false);
+  react(burntNow);
 }
 
 // ---------------------------------------------------------------- drawing
 function drawBoard() {
   const svg = $("#board");
-  const { viewBox, html } = boardSvg({ components: state.components, solution: state.solution, selected: state.selected, locked: state.locked, tool: state.tool, t: state.t });
+  const { viewBox, html } = boardSvg({ components: state.components, solution: state.solution, selected: state.selected, locked: state.locked, tool: state.tool, t: state.t, bounds: state.frozenView });
   svg.setAttribute("viewBox", viewBox.join(" "));
-  svg.innerHTML = html;
+  svg.innerHTML = `${html}<g id="drop-preview"></g>`;
+  for (const id of state.spot) svg.querySelector(`#parts g[data-id="${id}"]`)?.classList.add("spot");
   prepareCharges();
   const banner = $("#banner");
   const burnt = state.components.find((c) => c.burnt);
@@ -136,13 +156,12 @@ function buildToolbar() {
     const icon = tool === "select" ? `<svg viewBox="0 0 24 24"><path d="M5 3l14 8-6 2-3 6z" fill="currentColor"/></svg>`
       : tool === "erase" ? `<svg viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke="currentColor" stroke-width="2.5" fill="none"/></svg>` : toolIcon(tool);
     const name = names[tool] ?? TYPES[tool].name[state.ui];
-    const off = state.view === "3d" && tool !== "select"; // building happens on the schematic
-    return `<button type="button" class="tool" data-tool="${tool}" aria-pressed="${state.tool === tool}" ${off ? "disabled" : ""}>${icon}<span>${esc(name)}</span></button>`;
+    return `<button type="button" class="tool" data-tool="${tool}" aria-pressed="${state.tool === tool}">${icon}<span>${esc(name)}</span></button>`;
   }).join("") + `<button type="button" class="tool reset" data-reset="1"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 3-6.2M4 4v5h5" stroke="currentColor" stroke-width="2.2" fill="none"/></svg><span>${esc(t.reset)}</span></button>`;
 }
 $("#toolbar").addEventListener("click", (e) => {
   const b = e.target.closest("button");
-  if (!b) return;
+  if (!b || performance.now() - drag.ended < 300) return;
   if (b.dataset.reset) { usePreset(state.preset, state.locked); return; }
   state.tool = b.dataset.tool;
   for (const x of document.querySelectorAll(".tool[data-tool]")) x.setAttribute("aria-pressed", String(x.dataset.tool === state.tool));
@@ -159,7 +178,22 @@ function newId(type) {
 }
 const sameEdge = (c, a, b) => (String(c.a) === String(a) && String(c.b) === String(b)) || (String(c.a) === String(b) && String(c.b) === String(a));
 
+/** Put a part (or the eraser) on a grid edge; a locked part there stays. */
+function placeAt(type, a, b) {
+  const existing = state.components.find((c) => sameEdge(c, a, b));
+  if (existing && state.locked.includes(existing.id)) return false;
+  if (existing) state.components = state.components.filter((c) => c !== existing);
+  if (type !== "erase") {
+    const c = normalise({ id: newId(type), type, a, b });
+    state.components.push(c);
+    if (c.type !== "wire") state.selected = c.id;
+  }
+  recompute();
+  return true;
+}
+
 $("#board").addEventListener("click", (e) => {
+  if (performance.now() - drag.ended < 300) return;
   const hit = e.target.closest("[data-a]");
   const part = e.target.closest("[data-id]");
   if (state.tool === "select") {
@@ -171,16 +205,108 @@ $("#board").addEventListener("click", (e) => {
     return;
   }
   if (!hit) return;
-  const a = hit.dataset.a.split(",").map(Number), b = hit.dataset.b.split(",").map(Number);
-  const existing = state.components.find((c) => sameEdge(c, a, b));
-  if (existing && state.locked.includes(existing.id)) return;
-  if (state.tool === "erase") { if (existing) state.components = state.components.filter((c) => c !== existing); recompute(); return; }
-  if (existing) state.components = state.components.filter((c) => c !== existing);
-  const c = normalise({ id: newId(state.tool), type: state.tool, a, b });
-  state.components.push(c);
-  if (c.type !== "wire") state.selected = c.id;
-  recompute();
+  placeAt(state.tool, hit.dataset.a.split(",").map(Number), hit.dataset.b.split(",").map(Number));
 });
+
+// ---------------------------------------------------------------- drag and drop
+// Parts come off the tray and land on the bench, in 2D or 3D; a placed part can be picked up
+// and moved, or dropped off the bench to take it away. The circuit is solved again the
+// moment a part leaves or lands, so a bulb goes dark while its part is in the student's hand.
+const drag = { pending: null, active: null, ended: 0 };
+
+function overBench(x, y) {
+  const box = $(".canvas-wrap").getBoundingClientRect();
+  return x >= box.left && x <= box.right && y >= box.top && y <= box.bottom;
+}
+function edgeUnder(x, y) {
+  if (state.view === "3d") return bench3d?.edgeAt(x, y) ?? null;
+  const svg = $("#board"), box = svg.getBoundingClientRect();
+  if (x < box.left || x > box.right || y < box.top || y > box.bottom) return null;
+  const p = new DOMPoint(x, y).matrixTransform(svg.getScreenCTM().inverse());
+  return nearestEdge((p.x - PAD) / CELL, (p.y - PAD) / CELL, state.frozenView ?? boardView(state.components));
+}
+function showDropPreview(type, edge) {
+  bench3d?.preview(state.view === "3d" ? edge : null);
+  const layer = $("#drop-preview");
+  if (!layer) return;
+  if (!edge || state.view === "3d") { layer.innerHTML = ""; return; }
+  const [ax, ay] = px(edge.a), [bx, by] = px(edge.b), angle = Math.atan2(by - ay, bx - ax) * 180 / Math.PI;
+  const ghost = normalise({ id: "preview", type, a: edge.a, b: edge.b, ...(type === "switch" ? { closed: true } : {}) });
+  layer.innerHTML = `<line class="drop-glow" x1="${ax}" y1="${ay}" x2="${bx}" y2="${by}"/>
+    <g class="drop-ghost" transform="translate(${(ax + bx) / 2} ${(ay + by) / 2}) rotate(${angle})">${symbol(ghost, null, angle)}</g>`;
+}
+function beginDrag(item, e) {
+  const ghost = document.createElement("div");
+  ghost.className = "drag-ghost";
+  ghost.innerHTML = toolIcon(item.type);
+  document.body.appendChild(ghost);
+  state.frozenView = boardView(state.components);
+  bench3d?.setDragging(true);
+  if (item.comp) { // lifted: out of the circuit until it lands
+    state.components = state.components.filter((c) => c !== item.comp);
+    if (state.selected === item.comp.id) state.selected = null;
+    recompute();
+  }
+  drag.active = { ...item, ghost, edge: null, key: undefined };
+  moveDrag(e);
+}
+function moveDrag(e) {
+  const d = drag.active;
+  d.ghost.style.translate = `${e.clientX}px ${e.clientY}px`; // not transform: the ghost's scale would scale its position too
+  const edge = edgeUnder(e.clientX, e.clientY);
+  const blocked = edge && state.components.some((c) => sameEdge(c, edge.a, edge.b) && state.locked.includes(c.id));
+  d.ghost.classList.toggle("snap", Boolean(edge && !blocked));
+  d.ghost.classList.toggle("trash", Boolean(d.comp) && !overBench(e.clientX, e.clientY));
+  const key = edge && !blocked ? `${edge.a}|${edge.b}` : "";
+  if (key !== d.key) { d.key = key; d.edge = key ? edge : null; showDropPreview(d.type, d.edge); }
+}
+function endDrag(e, cancelled = false) {
+  const d = drag.active;
+  drag.active = null;
+  drag.ended = performance.now();
+  d.ghost.remove();
+  showDropPreview(null, null);
+  bench3d?.setDragging(false);
+  state.frozenView = null;
+  if (d.edge && !cancelled) {
+    if (!d.comp) { placeAt(d.type, d.edge.a, d.edge.b); return; }
+    state.components = state.components.filter((c) => !sameEdge(c, d.edge.a, d.edge.b));
+    Object.assign(d.comp, { a: d.edge.a, b: d.edge.b });
+    state.components.push(d.comp);
+    if (d.comp.type !== "wire") state.selected = d.comp.id;
+  } else if (d.comp && (cancelled || overBench(e.clientX, e.clientY))) {
+    state.components.push(d.comp); // nowhere to land: back where it was
+  } // a part dropped off the bench is gone
+  recompute();
+}
+$("#toolbar").addEventListener("pointerdown", (e) => {
+  const b = e.target.closest(".tool[data-tool]");
+  if (b && !["select", "erase"].includes(b.dataset.tool)) drag.pending = { type: b.dataset.tool, x: e.clientX, y: e.clientY, tray: true };
+});
+$("#board").addEventListener("pointerdown", (e) => {
+  if (state.tool !== "select") return;
+  const comp = state.components.find((c) => c.id === e.target.closest("[data-id]")?.dataset.id);
+  if (comp && !state.locked.includes(comp.id)) drag.pending = { type: comp.type, comp, x: e.clientX, y: e.clientY };
+});
+$("#bench3d").addEventListener("pointerdown", (e) => { // capture: runs before the camera controls
+  if (state.tool !== "select" || !bench3d) return;
+  const comp = state.components.find((c) => c.id === bench3d.pick(e.clientX, e.clientY));
+  if (!comp || comp.type === "wire" || state.locked.includes(comp.id)) return;
+  drag.pending = { type: comp.type, comp, x: e.clientX, y: e.clientY };
+  bench3d.holdControls(true);
+}, { capture: true });
+window.addEventListener("pointermove", (e) => {
+  if (drag.active) { moveDrag(e); return; }
+  const p = drag.pending;
+  if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  if (Math.hypot(dx, dy) < 8) return;
+  drag.pending = null;
+  if (p.tray && e.pointerType !== "mouse" && Math.abs(dx) > Math.abs(dy)) return; // a sideways swipe scrolls the tray
+  beginDrag(p, e);
+});
+window.addEventListener("pointerup", (e) => { if (drag.active) endDrag(e); drag.pending = null; bench3d?.holdControls(false); });
+window.addEventListener("pointercancel", (e) => { if (drag.active) endDrag(e, true); drag.pending = null; bench3d?.holdControls(false); });
 
 // ---------------------------------------------------------------- the inspector
 function drawInspector() {
@@ -211,11 +337,13 @@ function drawInspector() {
     if (c.type === "battery") c.V = Number(slider.value); else c.R = VALUES[c.type][Number(slider.value)];
     box.querySelector("#val").textContent = c.type === "battery" ? `${c.V} V` : `${c.R} Ω`;
     state.solution = solve(state.components);
-    for (const x of state.components) if (state.solution.components[x.id]?.burntNow) x.burnt = true;
+    const burntNow = state.components.filter((x) => state.solution.components[x.id]?.burntNow);
+    for (const x of burntNow) x.burnt = true;
     state.session.circuit(state.components);
     drawBoard();
     box.querySelector(".readings").outerHTML = (() => { const rr = state.solution.components[c.id] ?? {}; return `<div class="readings"><div><span>${t.voltage}</span>${format(Math.abs(rr.V ?? 0), "V")}</div><div><span>${t.current}</span>${format(Math.abs(rr.I ?? 0), "A")}</div><div><span>${t.power}</span>${format(rr.P ?? 0, "W")}</div></div>`; })();
     refreshPanel(false);
+    react(burntNow);
   };
   box.querySelector("#toggle")?.addEventListener("click", () => { c.closed = !c.closed; recompute(); });
   box.querySelector("#flip")?.addEventListener("click", () => { [c.a, c.b] = [c.b, c.a]; recompute(); });
@@ -224,7 +352,7 @@ function drawInspector() {
 }
 
 // ---------------------------------------------------------------- the panel
-const TABS = ["guide", "challenges", "measures", "tutor", "quiz"];
+const TABS = ["guide", "tutor", "quiz"];
 function buildTabs() {
   $("#tabs").innerHTML = TABS.map((tab) => `<button class="tab" role="tab" data-tab="${tab}" aria-selected="${state.tab === tab}">${esc(state.t[tab])}</button>`).join("");
   $("#tabs").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) showTab(b.dataset.tab); };
@@ -238,12 +366,12 @@ function showTab(tab) {
 // Live parts of the panel (goals, counts) update on every change; the rest only when asked.
 function refreshPanel(full) {
   if (!state.lab) return;
-  if (full || state.tab === "guide" || state.tab === "challenges" || state.tab === "measures") {
+  if (full || state.tab === "guide") {
     const body = $("#tab-body");
     const focus = document.activeElement?.id;
     if (!full && (state.tab === "tutor" || state.tab === "quiz")) return;
     if (!full) { updateLive(); return; }
-    body.innerHTML = { guide: guideHtml, challenges: challengesHtml, measures: measuresHtml, tutor: tutorHtml, quiz: quizHtml }[state.tab]();
+    body.innerHTML = { guide: guideHtml, tutor: tutorHtml, quiz: quizHtml }[state.tab]();
     wire[state.tab]?.();
     updateLive();
     if (focus) document.getElementById(focus)?.focus();
@@ -276,7 +404,12 @@ function updateLive() {
     const c = state.lab.challenges.find((x) => x.id === m.id);
     const ok = state.preset === c.preset && meets(state.solution, c.goals).ok;
     const banner = $("#banner");
-    if (ok && !state.done.has(c.id)) { state.done.add(c.id); state.session.add("success", { id: c.id, title: c.title }); }
+    if (ok && !state.done.has(c.id)) {
+      state.done.add(c.id);
+      state.session.add("success", { id: c.id, title: c.title });
+      tima?.say(voice.success, { interrupt: true });
+      celebrate();
+    }
     if (ok) { banner.hidden = false; banner.className = "banner ok"; banner.textContent = state.t.success; }
     document.getElementById("challenge-status")?.replaceChildren(document.createTextNode(ok ? state.t.success : ""));
   }
@@ -320,21 +453,34 @@ function guideHtml() {
         inner = `<b>${t.predict}</b><div>${esc(s.question)}</div><div class="choices">${s.choices.map((c, k) => `<button class="choice ${picked === undefined ? "" : k === s.answer ? "right" : k === picked ? "wrong" : ""}" data-predict="${key}" data-k="${k}" ${picked !== undefined ? "disabled" : ""}>${esc(c)}</button>`).join("")}</div>
           ${picked !== undefined ? `<div>${picked === s.answer ? t.correct : t.not_quite} <span class="muted">${esc(s.why ?? "")}</span></div>` : ""}`;
       } else if (s.kind === "do") inner = `${esc(s.instruction)}<div>${goalChips(s.goals, `a|${a.id}|${i}`)}</div>`;
-      else if (s.kind === "measure") inner = `${esc(s.instruction)}${done ? "" : `<div class="row"><button class="btn primary" data-record>${t.record}</button></div>`}<div class="muted"><span id="log-count">0</span> / ${s.points} ${t.points_needed} · <a href="#" data-goto="measures">${t.measures}</a></div>`;
+      else if (s.kind === "measure") inner = `${esc(s.instruction)}${plotHtml(state.log.rows.filter((r) => r.preset === a.preset))}<div class="muted"><span id="log-count">0</span> / ${s.points} ${t.points_needed}</div>`;
       else inner = `${esc(s.question)}<div class="row" style="margin-top:6px"><button class="btn" data-ask="${esc(s.question)}">${t.explain_this}</button></div>`;
       return `<div class="step ${done ? "done" : ""}">${inner}</div>`;
     }).join("");
     const last = m.step >= a.steps.length;
-    return `<h2>${esc(a.title)}</h2><div class="steps">${steps}</div>
-      ${last ? `<div class="takeaway"><b>${t.takeaway}</b><br>${esc(a.takeaway ?? "")}</div><div class="row" style="margin-top:10px"><button class="btn" id="back">${t.done}</button></div>`
+    return `<div class="mission-head"><button type="button" class="back" data-back aria-label="${t.done}">‹</button><h2>${esc(a.title)}</h2></div><div class="steps">${steps}</div>
+      ${last ? `<div class="takeaway"><b>${t.takeaway}</b><br>${esc(a.takeaway ?? "")}</div><div class="row" style="margin-top:10px"><button class="btn primary" data-back>${t.done}</button></div>`
         : `<div class="row"><button class="btn primary" id="next-step">${m.step + 1 >= a.steps.length ? t.done : t.next}</button></div>`}`;
+  }
+  if (m.kind === "challenge") {
+    const c = lab.challenges.find((x) => x.id === m.id);
+    return `<div class="mission-head"><button type="button" class="back" data-back aria-label="${t.done}">‹</button><h2>${esc(c.title)}</h2></div>
+      <p>${esc(c.statement)}</p><div style="margin:6px 0">${goalChips(c.goals, `c|${c.id}`)}</div><div id="challenge-status" class="muted"></div>
+      ${c.hint ? `<div class="row"><button class="btn" data-hint="${c.id}">💡 ${t.hint}</button></div>` : ""}`;
   }
   const offer = state.offerTranslation && lab.origin !== "sample"
     ? `<div class="translate-offer"><div>${esc(t.content_in.replace("{lang}", t.lang_names[lab.language?.slice(0, 2)] ?? lab.language))}</div><div class="row"><button class="btn primary" id="translate">${esc(t.translate)}</button></div><div class="muted" id="translate-status"></div></div>` : "";
-  return `${offer}<h2>${esc(lab.title)}</h2><p>${esc(lab.summary)}</p>
-    <h3>${t.objectives}</h3><ul>${lab.objectives.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>
-    ${lab.formulas?.length ? `<h3>${t.formulas}</h3>${lab.formulas.map((f) => `<div class="card"><div class="formula">${esc(f.text)}</div><div class="muted">${esc(f.meaning ?? "")}</div></div>`).join("")}` : ""}
-    <h3>${t.guide}</h3>${lab.activities.map((a) => `<div class="card"><b>${esc(a.title)}</b><div class="row"><button class="btn primary" data-activity="${a.id}">${t.start}</button></div></div>`).join("")}`;
+  // what to do first; what to know, folded until asked for
+  const play = `<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4.5v15l12-7.5z" fill="currentColor"/></svg>`;
+  const target = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></svg>`;
+  const mission = (kind, id, title, icon, done) => `<button type="button" class="activity ${kind} ${done ? "done" : ""}" data-${kind}="${id}"><span class="play">${icon}</span><span>${esc(title)}</span><span class="chev" aria-hidden="true">${done ? "✓" : "›"}</span></button>`;
+  const formulas = lab.formulas ?? [];
+  return `${offer}<div class="activities">${lab.activities.map((a) => mission("activity", a.id, a.title, play, state.finished.has(a.id))).join("")}
+    ${(lab.challenges ?? []).map((c) => mission("challenge", c.id, c.title, target, state.done.has(c.id))).join("")}</div>
+    ${formulas.length ? `<div class="formulas">${formulas.map((f) => `<span class="formula" title="${esc(f.meaning ?? "")}">${esc(f.text)}</span>`).join("")}</div>` : ""}
+    <details class="about"><summary>${t.about}</summary><p>${esc(lab.summary)}</p>
+      <h3>${t.objectives}</h3><ul>${lab.objectives.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>
+      ${formulas.length ? `<h3>${t.formulas}</h3><ul>${formulas.map((f) => `<li><b>${esc(f.text)}</b> <span class="muted">${esc(f.meaning ?? "")}</span></li>`).join("")}</ul>` : ""}</details>`;
 }
 const wire = {
   guide() {
@@ -345,6 +491,22 @@ const wire = {
       usePreset(a.preset);
       state.session.add("mode", { mode: "activity", title: a.title }); // after the preset: the video shows its circuit
       refreshPanel(true);
+      tima?.say(voice.activity(a), { interrupt: true });
+      narrateStep();
+    }));
+    body.querySelectorAll("[data-challenge]").forEach((b) => (b.onclick = () => {
+      const c = state.lab.challenges.find((x) => x.id === b.dataset.challenge);
+      state.mode = { kind: "challenge", id: c.id };
+      usePreset(c.preset, c.locked ?? []);
+      state.session.add("mode", { mode: "challenge", title: c.title });
+      refreshPanel(true);
+      tima?.say(voice.challenge(c), { interrupt: true });
+      idleHint();
+    }));
+    body.querySelectorAll("[data-hint]").forEach((b) => (b.onclick = () => {
+      const hint = state.lab.challenges.find((x) => x.id === b.dataset.hint).hint;
+      b.outerHTML = `<div class="muted">💡 ${esc(hint)}</div>`;
+      tima?.say(hint, { interrupt: true });
     }));
     body.querySelectorAll("[data-predict]").forEach((b) => (b.onclick = () => {
       const k = Number(b.dataset.k), [id, i] = b.dataset.predict.split(":");
@@ -352,43 +514,19 @@ const wire = {
       state.predicted[b.dataset.predict] = k;
       state.session.add("predict", { question: step.question, choice: step.choices[k], right: k === step.answer });
       refreshPanel(true);
+      tima?.say(k === step.answer ? voice.right(step.why) : voice.wrong(step.why), { interrupt: true });
     }));
-    body.querySelector("#next-step")?.addEventListener("click", () => { state.mode.step += 1; refreshPanel(true); });
-    body.querySelector("#back")?.addEventListener("click", () => { state.mode = { kind: "free" }; state.session.add("mode", {}); refreshPanel(true); });
-    body.querySelectorAll("[data-ask]").forEach((b) => (b.onclick = () => { showTab("tutor"); askTutor(b.dataset.ask); }));
-    body.querySelectorAll("[data-goto]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); showTab(b.dataset.goto); }));
-    body.querySelectorAll("[data-record]").forEach((b) => (b.onclick = () => { recordMeasure(); updateLive(); flash(b); }));
+    body.querySelector("#next-step")?.addEventListener("click", advance);
+    body.querySelectorAll("[data-back]").forEach((b) => (b.onclick = () => { state.mode = { kind: "free" }; state.session.add("mode", {}); refreshPanel(true); tima?.hush(); }));
+    body.querySelectorAll("[data-ask]").forEach((b) => (b.onclick = () => askTutor(b.dataset.ask)));
     body.querySelector("#translate")?.addEventListener("click", translateLab);
-  },
-  challenges() {
-    const body = $("#tab-body");
-    body.querySelectorAll("[data-challenge]").forEach((b) => (b.onclick = () => {
-      const c = state.lab.challenges.find((x) => x.id === b.dataset.challenge);
-      state.mode = { kind: "challenge", id: c.id };
-      usePreset(c.preset, c.locked ?? []);
-      state.session.add("mode", { mode: "challenge", title: c.title });
-      refreshPanel(true);
-    }));
-    body.querySelectorAll("[data-hint]").forEach((b) => (b.onclick = () => { b.outerHTML = `<div class="muted">💡 ${esc(state.lab.challenges.find((x) => x.id === b.dataset.hint).hint)}</div>`; }));
-  },
-  measures() {
-    const body = $("#tab-body");
-    body.querySelector("#target").onchange = (e) => { state.log.target = e.target.value; };
-    body.querySelector("#record").onclick = () => { recordMeasure(); refreshPanel(true); };
-    body.querySelector("#clear").onclick = () => { state.log.rows = []; refreshPanel(true); };
-    body.querySelector("#export").onclick = () => {
-      const csv = ["part,U (V),I (A),U/I (ohm)", ...state.log.rows.map((r) => `${r.part},${r.U.toFixed(3)},${r.I.toFixed(5)},${r.I > 0 ? (r.U / r.I).toFixed(1) : ""}`)].join("\n");
-      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([csv], { type: "text/csv" })), download: "timalens-lab-measures.csv" });
-      a.click();
-    };
   },
   tutor() {
     const body = $("#tab-body");
     const input = body.querySelector("#question");
     body.querySelector("#send").onclick = () => { const q = input.value.trim(); if (q) { input.value = ""; askTutor(q); } };
     input.onkeydown = (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); body.querySelector("#send").click(); } };
-    body.querySelector("#mic").onclick = toggleMic;
-    body.querySelector("#speak").onchange = (e) => { state.speak = e.target.checked; };
+    body.querySelector("#mic").onclick = () => tima?.tap();
   },
   quiz() {
     $("#tab-body").querySelectorAll("[data-q]").forEach((b) => (b.onclick = () => {
@@ -407,31 +545,91 @@ function recordMeasure() {
   state.log.rows.push({ preset: state.preset, part: state.log.target, U: Math.abs(r.V), I: Math.abs(r.I), source: battery?.V });
   state.session.add("measure", { part: state.log.target, U: Math.abs(r.V), I: Math.abs(r.I) });
 }
-function flash(el) { el.animate?.([{ transform: "scale(1.06)" }, { transform: "none" }], { duration: 220 }); }
 
-// --- challenges
-function challengesHtml() {
-  const t = state.t, m = state.mode;
-  return `<h2>${t.challenges}</h2>` + state.lab.challenges.map((c) => {
-    const active = m.kind === "challenge" && m.id === c.id;
-    return `<div class="card ${active ? "active" : ""}"><b>${state.done.has(c.id) ? "✅ " : ""}${esc(c.title)}</b><div>${esc(c.statement)}</div>
-      ${active ? `<div style="margin:6px 0">${goalChips(c.goals, `c|${c.id}`)}</div><div id="challenge-status" class="muted"></div>${c.hint ? `<button class="btn" data-hint="${c.id}">${t.hint}</button>` : ""}`
-        : `<div class="row"><button class="btn primary" data-challenge="${c.id}">${t.start}</button></div>`}</div>`;
-  }).join("");
+// --- steps the circuit completes move on by themselves; measurements are taken for the student
+let stepTimer = null, measureTimer = null, hintTimer = null;
+function advance() {
+  state.mode.step += 1;
+  refreshPanel(true);
+  narrateStep();
+}
+function narrateStep() {
+  const m = state.mode, a = state.lab.activities.find((x) => x.id === m.id);
+  const step = a.steps[m.step];
+  if (step) { tima?.say(voice.step(step)); autoStep(); return; }
+  state.finished.add(a.id);
+  tima?.say(`${voice.takeaway(a.takeaway)} ${voice.mission_done}`);
+  celebrate();
+}
+function autoStep() {
+  const m = state.mode;
+  if (m.kind !== "activity") return;
+  const a = state.lab.activities.find((x) => x.id === m.id), step = a.steps[m.step];
+  if (!step) return;
+  if (step.kind === "measure") { clearTimeout(measureTimer); measureTimer = setTimeout(autoMeasure, 650); }
+  if ((step.kind === "do" || step.kind === "measure") && stepComplete(a, step)) {
+    clearTimeout(stepTimer);
+    const at = m.step;
+    stepTimer = setTimeout(() => { if (state.mode === m && m.step === at) { tima?.say(voice.praise()); advance(); } }, 1500);
+  }
+}
+/** A new, settled reading on the part being studied becomes a point of the U(I) graph. */
+function autoMeasure() {
+  const r = state.solution.components[state.log.target];
+  if (!r || Math.abs(r.I) < 1e-6 || state.mode.kind !== "activity") return;
+  const U = Math.abs(r.V);
+  const rows = state.log.rows.filter((x) => x.preset === state.preset && x.part === state.log.target);
+  if (rows.some((x) => Math.abs(x.U - U) < Math.max(0.05, U * 0.04))) return;
+  recordMeasure();
+  if (!rows.length) tima?.say(voice.first_point);
+  refreshPanel(true);
+  autoStep();
+}
+/** Stuck on a challenge for a while: Tima offers its hint, once. */
+function idleHint() {
+  clearTimeout(hintTimer);
+  const m = state.mode;
+  if (m.kind !== "challenge" || state.done.has(m.id) || m.hinted) return;
+  const c = state.lab.challenges.find((x) => x.id === m.id);
+  if (c.hint) hintTimer = setTimeout(() => { if (state.mode === m && !state.done.has(m.id)) { m.hinted = true; tima?.say(voice.hint(c.hint)); } }, 25_000);
 }
 
-// --- measurements and the U(I) graph
-function measuresHtml() {
-  const t = state.t;
-  const options = state.components.filter((c) => ["resistor", "bulb", "led"].includes(c.type))
-    .map((c) => `<option value="${c.id}" ${c.id === state.log.target ? "selected" : ""}>${c.id}</option>`).join("");
-  const rows = state.log.rows;
-  const table = rows.length ? `<table class="log"><tr><th>#</th><th>U</th><th>I</th><th>U / I</th></tr>${rows.map((r, i) => `<tr><td>${i + 1} · ${r.part}</td><td>${format(r.U, "V")}</td><td>${format(r.I, "A")}</td><td>${r.I > 1e-6 ? `${(r.U / r.I).toFixed(0)} Ω` : "—"}</td></tr>`).join("")}</table>` : "";
-  return `<h2>${t.measures}</h2>
-    <div class="row"><label>${t.measure_on} <select id="target">${options}</select></label><button class="btn primary" id="record">${t.record}</button></div>
-    ${plotHtml(rows)}${table}
-    <div class="row"><button class="btn" id="clear">${t.clear}</button><button class="btn" id="export">${t.export}</button></div>`;
+// --- Tima reacts to what the circuit does: a short, a burnt part, a part lighting up
+function react(burntNow = []) {
+  const sol = state.solution;
+  const lit = state.components.filter((c) => !c.burnt && ((sol.components[c.id]?.brightness ?? 0) > 0.05 || sol.components[c.id]?.lit));
+  bench3d?.poke();
+  if (state.quiet) { for (const c of lit) state.announced.add(c.id); state.shorted = sol.shorted; return; }
+  if (sol.shorted && !state.shorted) tima?.say(voice.short, { interrupt: true });
+  else if (burntNow.length) { tima?.say(voice.burnt(burntNow[0].id), { interrupt: true }); burntNow.forEach((c) => burst(c.id)); }
+  else {
+    const fresh = lit.find((c) => !state.announced.has(c.id));
+    if (fresh) tima?.say(voice.lit(TYPES[fresh.type].name[state.ui], fresh.id));
+  }
+  for (const c of lit) state.announced.add(c.id);
+  state.shorted = sol.shorted;
+  idleHint();
+  autoStep();
 }
+/** A part burning out flashes on the schematic and throws sparks on the 3D bench. */
+function burst(id) {
+  bench3d?.burst(id);
+  document.querySelector(`#board g[data-id="${id}"]`)?.animate?.([{ filter: "drop-shadow(0 0 0 #ff9500)" }, { filter: "drop-shadow(0 0 14px #ff9500)" }, { filter: "drop-shadow(0 0 0 #ff9500)" }], { duration: 700 });
+}
+function celebrate() {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const wrap = $(".canvas-wrap"), colours = ["#0a66ff", "#3ad1ff", "#ffd54a", "#ff4fa3", "#34c759"];
+  for (let i = 0; i < 40; i++) {
+    const bit = document.createElement("i");
+    bit.className = "confetti";
+    bit.style.background = colours[i % colours.length];
+    bit.style.left = `${8 + Math.random() * 84}%`;
+    wrap.appendChild(bit);
+    bit.animate([{ transform: "translate(0, -20px) rotate(0)", opacity: 1 }, { transform: `translate(${(Math.random() - 0.5) * 180}px, ${280 + Math.random() * 220}px) rotate(${Math.random() * 720}deg)`, opacity: 0 }],
+      { duration: 1400 + Math.random() * 700, easing: "cubic-bezier(.2,.6,.4,1)" }).onfinish = () => bit.remove();
+  }
+}
+
 function plotHtml(rows) {
   if (rows.length < 1) return "";
   const W = 320, H = 220, m = 34;
@@ -464,10 +662,9 @@ function quizHtml() {
 // ---------------------------------------------------------------- the tutor
 function tutorHtml() {
   const t = state.t;
-  return `<h2>${t.tutor}</h2><div class="chat" id="chat">${state.chat.map((m) => `<div class="msg ${m.role === "user" ? "me" : "ai"}">${esc(m.content)}</div>`).join("")}</div>
+  return `<div class="chat" id="chat">${state.chat.map((m) => `<div class="msg ${m.role === "user" ? "me" : "ai"}">${esc(m.content)}</div>`).join("")}</div>
     <div class="ask"><textarea id="question" placeholder="${esc(t.ask_placeholder)}"></textarea>
-    <button class="btn" id="mic" title="${t.mic}">🎤</button><button class="btn primary" id="send">${t.send}</button></div>
-    <label class="muted" style="display:block;margin-top:6px"><input type="checkbox" id="speak" ${state.speak ? "checked" : ""}> ${t.speak}</label>`;
+    <button class="btn" id="mic" title="${t.mic}" aria-label="${t.mic}">🎤</button><button class="btn primary" id="send">${t.send}</button></div>`;
 }
 /** What the tutor sees: the circuit as solved, what the student is doing, their measurements. */
 function circuitContext() {
@@ -488,23 +685,64 @@ async function askTutor(question) {
   const thinking = { role: "assistant", content: state.t.thinking };
   state.chat.push(thinking);
   if (state.tab === "tutor") refreshPanel(true);
+  const image = await lookAtBench(); // Muse Spark's vision sees the bench as the student does
+  tima?.think(true);
   try {
-    const r = await fetch(`/api/labs/${encodeURIComponent(state.labId)}/tutor`, {
+    const r = await fetch(`/api/labs/${encodeURIComponent(state.labId)}/tutor/stream`, {
       method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ question, history: state.chat.slice(0, -2).slice(-8), context: circuitContext(), language: state.ui }),
+      body: JSON.stringify({ question, history: state.chat.slice(0, -2).slice(-8), context: circuitContext(), language: state.ui, ...(image ? { image } : {}) }),
     });
-    if (!r.ok) throw new Error(await r.text());
-    thinking.content = (await r.json()).answer;
+    if (!r.ok || !r.body) throw new Error(r.status);
+    // the answer streams in; each finished sentence goes to Tima at once, so she speaks while Muse Spark writes
+    let written = "", said = 0, pending = "";
+    const speakUpTo = (end) => {
+      if (end <= said) return;
+      if (!said) tima?.hush();
+      tima?.say(written.slice(said, end));
+      said = end;
+    };
+    const reader = r.body.pipeThrough(new TextDecoderStream()).getReader();
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      pending += value;
+      let cut;
+      while ((cut = pending.indexOf("\n\n")) >= 0) {
+        const line = pending.slice(0, cut);
+        pending = pending.slice(cut + 2);
+        if (!line.startsWith("data: ")) continue;
+        const event = JSON.parse(line.slice(6));
+        if (event.error) throw new Error(event.error);
+        if (!event.delta) continue;
+        if (!written) tima?.think(false);
+        written += event.delta;
+        thinking.content = written;
+        showLastAnswer(written);
+        speakUpTo(lastSentenceEnd(written));
+      }
+    }
+    if (!written) throw new Error("empty answer");
+    speakUpTo(written.length);
+    tima?.say("", { followUp: true }); // then she listens for a reply, without her name
   } catch {
-    thinking.content = offlineAnswer();
+    if (thinking.content === state.t.thinking) { // nothing came: the engine answers instead
+      thinking.content = offlineAnswer();
+      tima?.say(thinking.content, { interrupt: true });
+    }
   }
+  tima?.think(false);
   state.session.add("tutor", { q: question, a: thinking.content });
   if (state.tab === "tutor") refreshPanel(true);
-  if (state.speak && "speechSynthesis" in window) {
-    const u = new SpeechSynthesisUtterance(thinking.content);
-    u.lang = state.ui === "fr" ? "fr-FR" : "en-US"; // the tutor answers in the interface's language
-    speechSynthesis.speak(u);
-  }
+}
+/** Where the last complete sentence of a text ends (0 if none yet): ". " but not "1.5". */
+function lastSentenceEnd(text) {
+  let end = 0;
+  for (const m of text.matchAll(/[.!?…]+(?=\s)/g)) end = m.index + m[0].length;
+  return end;
+}
+function showLastAnswer(text) {
+  const last = document.querySelector("#chat .msg.ai:last-child");
+  if (last && state.tab === "tutor") last.textContent = text;
 }
 /** Without a connection the tutor falls back on what the engine knows: the readings, U/I for
  *  each part, the short circuit or the burnt part, and the challenge's hint. */
@@ -530,34 +768,78 @@ function offlineAnswer() {
   if (f) lines.push(`${fr ? "Rappel" : "Remember"} : ${f.text}`);
   return lines.join("\n");
 }
-// voice questions: record, send to Muse Voice Transcribe through the server, ask
-let recorder = null;
-async function toggleMic() {
-  const button = $("#mic");
-  if (recorder) { recorder.stop(); return; }
+// ---------------------------------------------------------------- Tima, the voice guide
+/** What the server offers Tima: Meta's realtime ears (with a key), and Voxtral's voice. */
+async function serverVoice() {
+  try { const h = await (await fetch("/api/health")).json(); return { ears: h.live_ears, voice: h.voice }; } catch { return {}; }
+}
+async function setUpTima() {
+  voice = lines(state.ui);
+  tima = new Tima($("#tima"), {
+    lang: state.ui, t: state.t, onAsk: askTutor, live: await serverVoice(),
+    onLook: () => askTutor(state.t.look_question),
+    onSentence: spotlight,
+  });
+}
+/** The parts Tima names in the sentence she is saying glow on the bench (R1, L2, D1...). */
+function spotlight(line) {
+  const named = new Set(String(line).match(/\b[BRLSDAV]\d{1,2}\b/g) ?? []);
+  state.spot = state.components.filter((c) => named.has(c.id)).map((c) => c.id);
+  for (const g of document.querySelectorAll("#board #parts g.spot")) g.classList.remove("spot");
+  for (const id of state.spot) document.querySelector(`#board #parts g[data-id="${id}"]`)?.classList.add("spot");
+  bench3d?.spotlight(state.spot);
+}
+/** A picture of the bench as it is on screen (the 3D table or the schematic), at most 1024
+ *  pixels wide, while a scan line sweeps over it. Null when it cannot be taken. */
+async function lookAtBench() {
+  const stage = $(".stage");
+  stage.classList.remove("scan");
+  void stage.offsetWidth; // restart the sweep
+  stage.classList.add("scan");
+  tima?.look(true);
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const chunks = [];
-    recorder = new MediaRecorder(stream);
-    recorder.ondataavailable = (e) => chunks.push(e.data);
-    recorder.onstop = async () => {
-      stream.getTracks().forEach((t) => t.stop());
-      recorder = null;
-      button.classList.remove("on");
-      button.textContent = "🎤";
-      const form = new FormData();
-      form.append("audio", new Blob(chunks, { type: chunks[0]?.type || "audio/webm" }), "question.webm");
-      form.append("language", state.ui);
-      try {
-        const r = await fetch("/api/transcribe", { method: "POST", body: form });
-        const text = (await r.json()).text?.trim();
-        if (text) askTutor(text);
-      } catch { /* the typed question still works */ }
-    };
-    recorder.start();
-    button.classList.add("on");
-    button.textContent = "■";
-  } catch { /* no microphone: typing still works */ }
+    let source;
+    if (state.view === "3d" && bench3d) source = bench3d.snapshot();
+    else {
+      const svg = $("#board"), box = svg.viewBox.baseVal;
+      const markup = standaloneSvg({ viewBox: [box.x, box.y, box.width, box.height], html: svg.innerHTML }, box.width * 2, box.height * 2);
+      source = new Image();
+      source.src = URL.createObjectURL(new Blob([markup], { type: "image/svg+xml" }));
+      await source.decode();
+    }
+    const width = Math.min(1024, source.width), height = Math.round((source.height * width) / source.width);
+    const canvas = Object.assign(document.createElement("canvas"), { width, height });
+    canvas.getContext("2d").drawImage(source, 0, 0, width, height);
+    if (source.src?.startsWith("blob:")) URL.revokeObjectURL(source.src);
+    return canvas.toDataURL("image/jpeg", 0.82);
+  } catch (error) {
+    console.warn("no picture of the bench", error);
+    return null;
+  } finally {
+    setTimeout(() => { tima?.look(false); stage.classList.remove("scan"); }, 900);
+  }
+}
+const missionCount = () => (state.lab.activities?.length ?? 0) + (state.lab.challenges?.length ?? 0);
+/** One tap opens the lab: browsers only let a page speak after one. Then the camera flies in
+ *  and Tima says what the lab is about and what its missions are. */
+function showIntro() {
+  const intro = $("#intro"), t = state.t;
+  $("#intro-title").textContent = state.lab.title;
+  $("#intro-sub").textContent = voice.missions(missionCount());
+  $("#intro-start").textContent = t.intro_start;
+  $("#intro-quiet").textContent = t.intro_quiet;
+  intro.hidden = false;
+  const open = (quiet) => {
+    intro.classList.add("out");
+    setTimeout(() => { intro.hidden = true; }, 650);
+    tima.start({ quiet });
+    bench3d?.flyIn();
+    tima.say(voice.welcome(state.lab, missionCount()));
+    if (!quiet) tima.toggleWake(true);
+  };
+  $("#intro-start").onclick = () => open(false);
+  $("#intro-quiet").onclick = () => open(true);
+  $("#intro-start").focus();
 }
 
 // ---------------------------------------------------------------- translation (Muse Spark)
@@ -597,7 +879,12 @@ async function setView(next) {
   $("#hint").textContent = next === "3d" ? state.t.build_in_2d : state.t.place_hint;
   drawBoard();
 }
-function pick3d(id) {
+function pick3d(id, point) {
+  if (state.tool !== "select" && point) { // a part in hand: tapping the bench puts it there
+    const edge = bench3d.edgeAt(point.x, point.y);
+    if (edge) placeAt(state.tool, edge.a, edge.b);
+    return;
+  }
   const c = state.components.find((x) => x.id === id);
   if (!c || c.type === "wire") { state.selected = null; drawBoard(); drawInspector(); return; }
   if (c.type === "switch" && !state.locked.includes(c.id)) c.closed = !c.closed;
@@ -605,6 +892,10 @@ function pick3d(id) {
   recompute();
 }
 $("#view-switch").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
+$("#vr").addEventListener("click", async () => {
+  await setView("3d");
+  try { await bench3d?.enterVR(); } catch (error) { console.error(error); }
+});
 
 // ---------------------------------------------------------------- the end: report, video, save
 $("#finish").addEventListener("click", openFinish);
@@ -614,7 +905,6 @@ function openFinish() {
   dialog.innerHTML = `<div class="in">
     <h2>${t.finish_title}</h2>
     <div class="tiles">
-      <div><b>${s.measures}</b><span>${t.measures}</span></div>
       <div><b>${s.challenges.solved} / ${s.challenges.total}</b><span>${t.challenges}</span></div>
       <div><b>${s.predictions.right} / ${s.predictions.total}</b><span>${t.predictions_label}</span></div>
       <div><b>${s.quiz.right} / ${s.quiz.total}</b><span>${t.quiz}</span></div>
@@ -678,7 +968,7 @@ async function saveSession() {
     const r = await fetch(`/api/labs/${encodeURIComponent(state.labId)}/sessions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(state.session.finish(state.lab)) });
     if (!r.ok) throw new Error(r.status);
     const { id } = await r.json();
-    const link = new URL(`replay.html?session=${id}`, location.href).href;
+    const link = new URL(`/replay?session=${id}`, location.origin).href;
     out.innerHTML = `<div class="takeaway">${t.saved}<br><code>${esc(link)}</code></div>
       <div class="row"><button class="btn" id="copy-link">${t.copy}</button><a class="btn" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(`${state.lab.title} : ${link}`)}">WhatsApp</a></div>`;
     out.querySelector("#copy-link").onclick = async (e) => { try { await navigator.clipboard.writeText(link); e.target.textContent = t.copied; } catch { /* the link is shown */ } };
@@ -687,5 +977,11 @@ async function saveSession() {
   }
 }
 
-loadLab();
-requestAnimationFrame(animate);
+let mounted = false;
+/** Start the lab on the page's markup (once: React may run its effects twice in development). */
+export function mountLab() {
+  if (mounted) return;
+  mounted = true;
+  loadLab();
+  requestAnimationFrame(animate);
+}

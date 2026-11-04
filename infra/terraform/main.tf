@@ -73,6 +73,32 @@ resource "google_secret_manager_secret_version" "model_api_key" {
   secret_data = var.model_api_key
 }
 
+# Tima's voice (Voxtral), only when a key is given
+resource "google_secret_manager_secret" "mistral_api_key" {
+  count     = var.mistral_api_key == "" ? 0 : 1
+  secret_id = "${var.service_name}-mistral-api-key"
+  labels    = var.labels
+
+  replication {
+    auto {}
+  }
+
+  depends_on = [google_project_service.enabled]
+}
+
+resource "google_secret_manager_secret_version" "mistral_api_key" {
+  count       = var.mistral_api_key == "" ? 0 : 1
+  secret      = google_secret_manager_secret.mistral_api_key[0].id
+  secret_data = var.mistral_api_key
+}
+
+resource "google_secret_manager_secret_iam_member" "app_reads_voice_key" {
+  count     = var.mistral_api_key == "" ? 0 : 1
+  secret_id = google_secret_manager_secret.mistral_api_key[0].id
+  role      = "roles/secretmanager.secretAccessor"
+  member    = google_service_account.app.member
+}
+
 # ---------------------------------------------------------------- identity: least privilege for the service
 resource "google_service_account" "app" {
   account_id   = var.service_name
@@ -153,6 +179,19 @@ resource "google_cloud_run_v2_service" "app" {
       }
 
       dynamic "env" {
+        for_each = google_secret_manager_secret.mistral_api_key
+        content {
+          name = "MISTRAL_API_KEY"
+          value_source {
+            secret_key_ref {
+              secret  = env.value.secret_id
+              version = "latest"
+            }
+          }
+        }
+      }
+
+      dynamic "env" {
         for_each = var.env
         content {
           name  = env.key
@@ -186,6 +225,8 @@ resource "google_cloud_run_v2_service" "app" {
     google_project_service.enabled,
     google_secret_manager_secret_iam_member.app_reads_key,
     google_secret_manager_secret_version.model_api_key,
+    google_secret_manager_secret_version.mistral_api_key,
+    google_secret_manager_secret_iam_member.app_reads_voice_key,
     google_storage_bucket_iam_member.app_uses_data,
   ]
 }

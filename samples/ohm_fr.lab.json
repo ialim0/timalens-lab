@@ -32,7 +32,7 @@
   {"id": "discover", "title": "Découvrir la loi d'Ohm", "preset": "ohm",
    "steps": [
     {"kind": "predict", "question": "Si on double la tension de la pile, que devient l'intensité dans la résistance ?", "choices": ["Elle reste la même", "Elle double", "Elle diminue de moitié"], "answer": 1, "why": "U = R × I : à R fixe, I est proportionnelle à U."},
-    {"kind": "measure", "instruction": "Change la tension de la pile (touche la pile) et enregistre au moins 4 mesures de U et I avec le bouton « Enregistrer la mesure ».", "points": 4},
+    {"kind": "measure", "instruction": "Touche la pile et change sa tension plusieurs fois : chaque nouvelle valeur ajoute un point à la courbe U(I).", "points": 4},
     {"kind": "observe", "question": "Les points forment-ils une droite qui passe par l'origine ? Que vaut sa pente ?"}
    ],
    "takeaway": "U et I sont proportionnelles : la pente de la droite U = f(I) est la résistance, ici environ 100 Ω."},

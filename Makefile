@@ -10,7 +10,7 @@ REGION ?= europe-west1
 
 .PHONY: help
 help: ## List the available tasks
-	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"} /^[a-zA-Z0-9_-]+:.*##/ {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # ---------------------------------------------------------------- local development
 $(VENV):
@@ -18,21 +18,41 @@ $(VENV):
 	$(PY) -m pip install -q --upgrade pip
 	$(PY) -m pip install -q -e ".[dev]"
 
+frontend/node_modules: frontend/package-lock.json
+	cd frontend && npm ci --no-audit --no-fund
+	@touch $@
+
 .PHONY: install
-install: $(VENV) ## Create the virtualenv and install the app with dev tools
+install: $(VENV) frontend/node_modules ## Install the server (virtualenv) and the web app (npm)
 
 .PHONY: dev
-dev: $(VENV) ## Run the server with auto-reload on http://localhost:8080 (PORT=… to change)
-	@[ -f .env ] && set -a && . ./.env && set +a; $(VENV)/bin/uvicorn app.server:app --reload --port $(PORT)
+dev: $(VENV) frontend/node_modules ## Run the API (:8080) and the web app with hot reload: open http://localhost:3000
+	@[ -f .env ] && set -a && . ./.env && set +a; \
+	trap 'kill 0' EXIT; \
+	$(VENV)/bin/uvicorn app.server:app --reload --port 8080 & \
+	cd frontend && NEXT_PUBLIC_LIVE_URL=ws://localhost:8080/api/live npm run dev
+
+.PHONY: build
+build: frontend/node_modules ## Build the web app to static files (frontend/out), served by the API
+	cd frontend && npm run build
+
+.PHONY: serve
+serve: $(VENV) build ## Build, then run everything as in production on http://localhost:8080
+	@[ -f .env ] && set -a && . ./.env && set +a; $(VENV)/bin/uvicorn app.server:app --port $(PORT)
 
 .PHONY: test
-test: $(VENV) ## Run the Node and Python test suites
+test: $(VENV) frontend/node_modules ## Run the engine (Node) and server (pytest) tests
 	node --test tests/*.test.mjs
 	$(PY) -m pytest
 
+.PHONY: e2e
+e2e: $(VENV) build ## Run the end-to-end tests in Chrome (Playwright)
+	cd frontend && npx playwright test
+
 .PHONY: lint
-lint: $(VENV) ## Lint Python and check Terraform formatting
+lint: $(VENV) frontend/node_modules ## Lint Python, type-check the web app, check Terraform formatting
 	$(VENV)/bin/ruff check .
+	cd frontend && npm run typecheck
 	@command -v terraform >/dev/null && terraform fmt -recursive -check infra || echo "terraform not installed: skipping"
 
 .PHONY: format
@@ -69,6 +89,6 @@ destroy: ## Tear the Cloud Run deployment down (the data bucket is kept unless e
 	terraform -chdir=infra/terraform destroy -var "project_id=$(PROJECT)" -var "region=$(REGION)"
 
 .PHONY: clean
-clean: ## Remove caches and the virtualenv
-	rm -rf $(VENV) .pytest_cache .ruff_cache *.egg-info
+clean: ## Remove caches, builds, the virtualenv and node_modules
+	rm -rf $(VENV) .pytest_cache .ruff_cache *.egg-info frontend/node_modules frontend/.next frontend/out
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

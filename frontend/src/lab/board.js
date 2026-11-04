@@ -69,14 +69,24 @@ export function view(components) {
   if (!xs.length) return { x0: 0, y0: 0, x1: COLS - 1, y1: ROWS - 1 };
   return { x0: Math.max(0, Math.min(...xs) - 2), x1: Math.min(COLS - 1, Math.max(...xs) + 2), y0: Math.max(0, Math.min(...ys) - 1), y1: Math.min(ROWS - 1, Math.max(...ys) + 1) };
 }
+/** The grid edge nearest to a point in grid units (gx, gy), within the bounds v, or null when
+ *  the point is off the board. Dragged parts snap to it, in 2D and on the 3D bench alike. */
+export function nearestEdge(gx, gy, v = { x0: 0, y0: 0, x1: COLS - 1, y1: ROWS - 1 }) {
+  if (gx < v.x0 - 0.6 || gx > v.x1 + 0.6 || gy < v.y0 - 0.6 || gy > v.y1 + 0.6) return null;
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+  const rx = clamp(Math.round(gx), v.x0, v.x1), ry = clamp(Math.round(gy), v.y0, v.y1);
+  const fx = clamp(Math.floor(gx), v.x0, v.x1 - 1), fy = clamp(Math.floor(gy), v.y0, v.y1 - 1);
+  const horizontal = v.x1 > v.x0 && (v.y1 === v.y0 || Math.abs(gy - ry) <= Math.abs(gx - rx));
+  return horizontal ? { a: [fx, ry], b: [fx + 1, ry] } : { a: [rx, fy], b: [rx, fy + 1] };
+}
 export function viewBox(v) {
   return [v.x0 * CELL, v.y0 * CELL, (v.x1 - v.x0) * CELL + 2 * PAD, (v.y1 - v.y0) * CELL + 2 * PAD];
 }
 
 /** The board's SVG content (without the <svg> element): grid, parts, labels, and the edges a
  *  tool can be placed on. Charges are drawn by the caller, from chargePaths(). */
-export function boardSvg({ components, solution, selected = null, locked = [], tool = "select", t }) {
-  const v = view(components);
+export function boardSvg({ components, solution, selected = null, locked = [], tool = "select", t, bounds = null }) {
+  const v = bounds ?? view(components); // a drag keeps the board still while a part is lifted
   let dots = "", hits = "";
   for (let y = v.y0; y <= v.y1; y++) for (let x = v.x0; x <= v.x1; x++) {
     const [cx, cy] = px([x, y]);

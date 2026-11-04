@@ -1,7 +1,7 @@
 """From a lesson to a lab: Muse Spark designs it, the circuit engine checks it.
 
 Muse Spark reads the whole lesson (its context holds a full course) and writes the lab as
-JSON in the format below. The engine (web/js/labcheck.js, run with Node) lays out and
+JSON in the format below. The engine (frontend/src/lab/labcheck.js, run with Node) lays out and
 solves every preset circuit and proves every challenge can be met with the controls the
 student may touch. Anything wrong goes back to the model in the checker's words, up to
 three times. The model configures the lab; it never computes the physics.
@@ -59,7 +59,7 @@ and current. You only configure the lab. Answer with ONE JSON object, nothing el
    {"id", "title", "preset": "preset id", "steps": [
       {"kind": "predict", "question", "choices": [...], "answer": index, "why"},
       {"kind": "do", "instruction", "goals": [goals, optional: completed when met]},
-      {"kind": "measure", "instruction", "points": 3 to 6} (the student records U and I in the log, which draws U(I)),
+      {"kind": "measure", "instruction", "points": 3 to 6} (each new reading is recorded automatically and drawn on U(I)),
       {"kind": "observe", "question"} ],
     "takeaway": "the idea to remember"} ],
    Use predict, then do or measure, then observe: the student commits to a prediction

@@ -2,10 +2,14 @@
 // Nothing here computes physics. Brightness, readings, burnt parts and the flow of charges
 // all come from circuit.js, through update(). Loaded only when a student opens the 3D view,
 // so a phone that never does pays nothing for it.
+//
+// The bench floats in an open room over a glowing floor. Parts can be dropped onto it
+// (edgeAt + preview), a tap picks a part, a burnt part throws sparks and smokes, and on a
+// headset (Meta Quest) the whole bench can be entered in VR.
 import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { format } from "./circuit.js";
-import { chargeAt, chargePaths, resistorBands } from "./board.js";
+import { chargeAt, chargePaths, nearestEdge, resistorBands, view } from "./board.js";
 
 const WIRE_Y = 0.06;
 const SIZE = 1.45; // parts are drawn larger than the grid would make them, to read on a phone
@@ -50,6 +54,18 @@ function glow(color, size) {
   sprite.scale.set(size, size, 1);
   return sprite;
 }
+/** The room: deep blue at the top, lighter at the horizon, where the fog meets the floor. */
+function skyTexture() {
+  const c = document.createElement("canvas"); c.width = 8; c.height = 256;
+  const g = c.getContext("2d"); const grad = g.createLinearGradient(0, 0, 0, 256);
+  grad.addColorStop(0, "#050b1e"); grad.addColorStop(0.55, "#0f1d3d"); grad.addColorStop(1, "#1b2f5c");
+  g.fillStyle = grad; g.fillRect(0, 0, 8, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const HORIZON = "#16274d";
+const ease = (k) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
+
 function matTexture() {
   const c = document.createElement("canvas"); c.width = c.height = 256;
   const g = c.getContext("2d");
@@ -88,7 +104,7 @@ function rod(p, q, radius, material) {
 }
 
 export class Bench3D {
-  constructor(canvas, { interactive = true, onPick = () => {}, quality = "auto", margin = 1.02 } = {}) {
+  constructor(canvas, { interactive = true, onPick = () => {}, quality = "auto", margin = 1.14 } = {}) {
     this.canvas = canvas;
     this.margin = margin;
     const low = quality === "low" || (quality === "auto" && (navigator.hardwareConcurrency ?? 4) <= 4);
@@ -99,36 +115,176 @@ export class Bench3D {
     this.renderer.shadowMap.enabled = !low;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color("#e9e4da");
-    this.camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.1, 100);
-    this.scene.add(new THREE.HemisphereLight("#ffffff", "#8a7a66", 1.1));
+    this.scene.background = skyTexture();
+    this.scene.fog = new THREE.Fog(HORIZON, 18, 60);
+    this.camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.1, 200);
+    this.scene.add(new THREE.HemisphereLight("#e4ecff", "#2a3456", 1.25));
+    const rim = new THREE.DirectionalLight("#6fb6ff", 1.1); // a cool light from behind outlines the parts
+    rim.position.set(-4, 3, -6);
+    this.scene.add(rim);
     const sun = new THREE.DirectionalLight("#fff6e8", 2.2);
     sun.position.set(3, 7, 5);
     sun.castShadow = true;
     sun.shadow.mapSize.set(1024, 1024);
     Object.assign(sun.shadow.camera, { left: -8, right: 8, top: 8, bottom: -8 });
     this.scene.add(sun);
-    const table = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.8 }));
-    table.rotation.x = -Math.PI / 2; table.receiveShadow = true;
-    this.scene.add(table);
+    this.world = new THREE.Group(); // the bench and all it holds: scaled down and set at arm's length in VR
+    this.scene.add(this.world);
+    this.wood = woodTexture();
+    this.table = new THREE.Mesh(new THREE.BoxGeometry(1, 0.36, 1), new THREE.MeshStandardMaterial({ map: this.wood, roughness: 0.75 }));
+    this.table.position.y = -0.18; this.table.receiveShadow = true;
+    this.world.add(this.table);
+    const floor = new THREE.GridHelper(240, 240, "#3ad1ff", "#1d3a70");
+    floor.position.y = -2.6;
+    floor.material.transparent = true; floor.material.opacity = 0.32;
+    this.world.add(floor);
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshBasicMaterial({ map: glow("#fff", 1).material.map, color: "#2a8cff", transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+    pool.rotation.x = -Math.PI / 2; pool.position.y = -2.58; pool.scale.setScalar(26); // light spilling from the bench onto the floor
+    this.world.add(pool);
     this.mat = new THREE.Mesh(new THREE.BoxGeometry(1, 0.02, 1), new THREE.MeshStandardMaterial({ color: "#ffffff", map: matTexture(), roughness: 0.92 }));
     this.mat.receiveShadow = true; this.mat.position.y = 0.01;
-    this.scene.add(this.mat);
-    this.parts = new THREE.Group(); this.scene.add(this.parts);
-    this.chargeMesh = null; this.paths = []; this.dynamic = [];
+    this.world.add(this.mat);
+    this.parts = new THREE.Group(); this.world.add(this.parts);
+    this.chargeMesh = null; this.paths = []; this.anim = []; this.sparks = []; this.mids = new Map();
+    this.interactive = interactive; this.lastInput = performance.now();
     this.target = new THREE.Vector3(); this.distance = 8; this.fitted = "";
     if (interactive) {
       this.controls = new OrbitControls(this.camera, canvas);
       Object.assign(this.controls, { enableDamping: true, dampingFactor: 0.08, maxPolarAngle: Math.PI * 0.46, minDistance: 2.5, maxDistance: 18, enablePan: true });
+      Object.assign(this.controls, { autoRotateSpeed: 0.35 });
       let down = null;
-      canvas.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; });
+      canvas.addEventListener("pointerdown", (e) => { down = [e.clientX, e.clientY]; this.poke(); this.intro = null; });
       canvas.addEventListener("pointerup", (e) => {
         if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 6) return;
-        onPick(this.pick(e.clientX, e.clientY));
+        onPick(this.pick(e.clientX, e.clientY), { x: e.clientX, y: e.clientY });
       });
+      let hovering = false;
+      canvas.addEventListener("pointermove", (e) => { // a soft ring shows what a tap would pick
+        if (hovering || this.dragging || e.buttons) return;
+        hovering = true;
+        requestAnimationFrame(() => {
+          hovering = false;
+          this.hover = this.pick(e.clientX, e.clientY);
+          canvas.style.cursor = this.hover && !this.hover.startsWith("w") ? "grab" : "";
+        });
+      });
+      canvas.addEventListener("pointerleave", () => { this.hover = null; });
       new ResizeObserver(() => this.resize()).observe(canvas);
+      this.hoverRing = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.56, 48), new THREE.MeshBasicMaterial({ color: "#3ad1ff", transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false }));
+      this.hoverRing.rotation.x = -Math.PI / 2; this.hoverRing.visible = false;
+      this.world.add(this.hoverRing);
+      if (navigator.xr) this.setUpXR(onPick);
     }
     this.raycaster = new THREE.Raycaster();
+  }
+
+  /** Any input: the showroom rotation waits until the student has been still a while. */
+  poke() { this.lastInput = performance.now(); }
+  /** While a part is in the student's hand, the camera holds still. */
+  holdControls(on) { if (this.controls) this.controls.enabled = !on; }
+  setDragging(on) {
+    this.dragging = on;
+    this.holdControls(on);
+    this.canvas.style.cursor = on ? "grabbing" : "";
+    if (on) this.hover = null;
+    this.poke();
+  }
+
+  /** The grid edge under a screen point, for dropping a part on the bench. */
+  edgeAt(clientX, clientY) {
+    const rect = this.canvas.getBoundingClientRect();
+    if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null;
+    const p = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(p, this.camera);
+    const hit = this.raycaster.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -WIRE_Y), new THREE.Vector3());
+    if (!hit) return null;
+    this.world.worldToLocal(hit);
+    return nearestEdge(hit.x + this.cx, hit.z + this.cy, this.bounds);
+  }
+
+  /** A glowing beam where a dragged part would land (null hides it). */
+  preview(edge) {
+    if (this.previewObj) { this.world.remove(this.previewObj); this.previewObj = null; }
+    if (!edge) return;
+    const material = new THREE.MeshBasicMaterial({ color: "#3ad1ff", transparent: true, opacity: 0.6, depthWrite: false });
+    const g = new THREE.Group();
+    g.add(rod(this.at(edge.a, WIRE_Y + 0.03), this.at(edge.b, WIRE_Y + 0.03), 0.07, material));
+    for (const end of [edge.a, edge.b]) {
+      const dot = new THREE.Mesh(geo("pdot", () => new THREE.SphereGeometry(0.11, 16, 12)), material);
+      dot.position.copy(this.at(end, WIRE_Y + 0.03)); g.add(dot);
+    }
+    const halo = glow("#3ad1ff", 1.6); halo.position.copy(this.at(edge.a).add(this.at(edge.b)).multiplyScalar(0.5)).setY(0.25); g.add(halo);
+    g.userData.material = material;
+    this.previewObj = g;
+    this.world.add(g);
+  }
+
+  /** Sparks fly from a part that just burnt out. */
+  burst(id) {
+    const at = this.mids.get(id);
+    if (!at) return;
+    const n = 48, positions = new Float32Array(n * 3), velocity = [];
+    for (let i = 0; i < n; i++) {
+      positions.set([at.x, 0.35, at.z], i * 3);
+      const a = Math.random() * Math.PI * 2, up = 1.5 + Math.random() * 2.5, out = 0.6 + Math.random() * 1.8;
+      velocity.push(new THREE.Vector3(Math.cos(a) * out, up, Math.sin(a) * out));
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const points = new THREE.Points(geometry, new THREE.PointsMaterial({ color: "#ffc34a", size: 0.07, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+    this.world.add(points);
+    this.sparks.push({ points, velocity, born: performance.now() });
+  }
+
+  /** The bench as a picture, for Muse Spark's vision: render now, read the pixels at once. */
+  snapshot() {
+    this.renderer.render(this.scene, this.camera);
+    return this.canvas;
+  }
+
+  /** Golden rings around the parts Tima is talking about. */
+  spotlight(ids = []) {
+    for (const ring of this.spots ?? []) this.world.remove(ring);
+    this.spots = ids.map((id) => {
+      const ring = new THREE.Mesh(geo("spot", () => new THREE.RingGeometry(0.55, 0.66, 48)), new THREE.MeshBasicMaterial({ color: "#ffd54a", transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
+      ring.rotation.x = -Math.PI / 2; ring.userData.id = id;
+      this.world.add(ring);
+      return ring;
+    });
+  }
+
+  /** The camera swoops down from high above onto the bench, once, when the lab opens. */
+  flyIn() {
+    if (!this.controls) return;
+    this.intro = { start: performance.now(), duration: 2800 };
+  }
+
+  // ---------------------------------------------------------------- VR (Meta Quest and other WebXR headsets)
+  async xrSupported() {
+    try { return Boolean(navigator.xr && (await navigator.xr.isSessionSupported("immersive-vr"))); } catch { return false; }
+  }
+  async enterVR() {
+    const session = await navigator.xr.requestSession("immersive-vr", { optionalFeatures: ["local-floor", "hand-tracking"] });
+    await this.renderer.xr.setSession(session);
+    this.start();
+  }
+  setUpXR(onPick) {
+    const xr = this.renderer.xr;
+    xr.enabled = true;
+    xr.setReferenceSpaceType("local-floor");
+    const room = this.scene.background;
+    xr.addEventListener("sessionstart", () => { // the bench at table height, an arm's length away
+      this.world.scale.setScalar(0.11); this.world.position.set(0, 0.9, -0.75);
+      this.scene.background = new THREE.Color(HORIZON);
+    });
+    xr.addEventListener("sessionend", () => { this.world.scale.setScalar(1); this.world.position.set(0, 0, 0); this.scene.background = room; });
+    for (const i of [0, 1]) {
+      const hand = xr.getController(i);
+      const laser = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3(0, 0, -1)]), new THREE.LineBasicMaterial({ color: "#3ad1ff" }));
+      laser.scale.z = 4; hand.add(laser);
+      hand.addEventListener("select", () => { this.raycaster.setFromXRController(hand); const id = this.hitId(); if (id) onPick(id, null); });
+      this.scene.add(hand);
+    }
   }
 
   /** World position of a grid point. */
@@ -136,13 +292,16 @@ export class Bench3D {
 
   update(components, solution, { selected = null, electrons = false, t = {} } = {}) {
     for (const child of [...this.parts.children]) { this.parts.remove(child); child.traverse((o) => { if (o.material?.map && o.material.map !== glowTexture && o.isSprite) o.material.map.dispose(); if (o.isSprite) o.material.dispose(); }); }
-    this.dynamic = [];
+    this.anim = []; this.mids.clear();
+    this.bounds = view(components);
     const xs = components.flatMap((c) => [c.a[0], c.b[0]]), ys = components.flatMap((c) => [c.a[1], c.b[1]]);
     const [x0, x1, y0, y1] = xs.length ? [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)] : [0, 4, 0, 4];
     this.cx = (x0 + x1) / 2; this.cy = (y0 + y1) / 2;
     const w = x1 - x0 + 1.6, d = y1 - y0 + 1.6;
     this.mat.scale.set(w, 1, d);
     this.mat.material.map.repeat.set(w / 2, d / 2);
+    this.table.scale.set(w + 3, 1, d + 3);
+    this.wood.repeat.set((w + 3) / 4, (d + 3) / 4);
     const key = `${x0},${x1},${y0},${y1}`;
     if (key !== this.fitted) { this.fit(w, d); this.fitted = key; }
     const nodes = new Map();
@@ -154,12 +313,12 @@ export class Bench3D {
     for (const c of components) this.parts.add(this.part(c, solution?.components[c.id] ?? {}, { selected: selected === c.id, shorted: solution?.shorted, t }));
     // charges: one small bright sphere per path, moved every frame
     this.paths = chargePaths(components, solution, electrons).map((ch) => ({ ...ch, pa: this.at(ch.a, WIRE_Y + 0.07), pb: this.at(ch.b, WIRE_Y + 0.07) }));
-    if (this.chargeMesh) { this.scene.remove(this.chargeMesh); this.chargeMesh.dispose(); }
+    if (this.chargeMesh) { this.world.remove(this.chargeMesh); this.chargeMesh.dispose(); }
     this.chargeMesh = null;
     if (this.paths.length) {
       const color = solution?.shorted ? "#ff3b30" : electrons ? "#4aa3ff" : "#ffd54a";
       this.chargeMesh = new THREE.InstancedMesh(geo("charge", () => new THREE.SphereGeometry(0.05, 10, 8)), new THREE.MeshBasicMaterial({ color }), this.paths.length);
-      this.scene.add(this.chargeMesh);
+      this.world.add(this.chargeMesh);
     }
   }
 
@@ -172,8 +331,7 @@ export class Bench3D {
     if (this.controls) { this.controls.target.copy(this.target); this.controls.update(); }
   }
   /** Put the camera on its orbit: azimuth in radians (0 = the student's side), elevation. */
-  orbit(azimuth, elevation = 0.92) {
-    const r = this.distance;
+  orbit(azimuth, elevation = 0.92, r = this.distance) {
     this.camera.position.set(this.target.x + r * Math.cos(elevation) * Math.sin(azimuth), r * Math.sin(elevation), this.target.z + r * Math.cos(elevation) * Math.cos(azimuth));
     this.camera.lookAt(this.target);
   }
@@ -182,6 +340,7 @@ export class Bench3D {
     const g = new THREE.Group();
     g.userData.id = c.id;
     const a = this.at(c.a), b = this.at(c.b), mid = a.clone().add(b).multiplyScalar(0.5);
+    this.mids.set(c.id, mid);
     const dir = b.clone().sub(a).normalize();
     const along = (s, h = WIRE_Y) => mid.clone().addScaledVector(dir, s).setY(h);
     const lead = std("#b8bec4", { metalness: 0.85, roughness: 0.25 });
@@ -278,8 +437,11 @@ export class Bench3D {
       }
     }
     if (c.burnt) {
-      const smoke = glow("#333333", 0.5); smoke.material.blending = THREE.NormalBlending; smoke.material.opacity = 0.55;
-      smoke.position.copy(mid).setY(0.7); g.add(smoke);
+      for (let i = 0; i < 3; i++) {
+        const smoke = glow("#3a3a3a", 0.5); smoke.material.blending = THREE.NormalBlending;
+        smoke.position.copy(mid); g.add(smoke);
+        this.anim.push((s) => { const k = (s * 0.32 + i / 3) % 1; smoke.position.y = 0.45 + k * 1.1; smoke.material.opacity = 0.55 * (1 - k); smoke.scale.setScalar(0.35 + k * 0.8); });
+      }
     }
     if (selected) {
       const ring = new THREE.Mesh(geo("ring", () => new THREE.RingGeometry(0.36, 0.42, 40)), new THREE.MeshBasicMaterial({ color: "#e0453a", side: THREE.DoubleSide }));
@@ -298,6 +460,9 @@ export class Bench3D {
     const rect = this.canvas.getBoundingClientRect();
     const p = new THREE.Vector2(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(p, this.camera);
+    return this.hitId();
+  }
+  hitId() {
     const hits = this.raycaster.intersectObjects(this.parts.children, true).filter((h) => h.object.userData.hit);
     const wire = (id) => id?.startsWith("w");
     return hits.find((h) => !wire(h.object.userData.id))?.object.userData.id ?? hits[0]?.object.userData.id ?? null;
@@ -317,16 +482,43 @@ export class Bench3D {
       this.paths.forEach((ch, i) => { p.lerpVectors(ch.pa, ch.pb, chargeAt(ch, t)); m.makeTranslation(p.x, p.y, p.z); this.chargeMesh.setMatrixAt(i, m); });
       this.chargeMesh.instanceMatrix.needsUpdate = true;
     }
-    this.controls?.update();
+    const now = performance.now(), s = now / 1000;
+    if (this.intro) {
+      const k = ease(Math.min(1, (now - this.intro.start) / this.intro.duration));
+      this.orbit(-1.25 * (1 - k), 1.4 - 0.48 * k, this.distance * (3 - 2 * k));
+      if (k >= 1) { this.intro = null; this.controls.target.copy(this.target); this.controls.update(); }
+    } else if (this.controls && !this.renderer.xr.isPresenting) {
+      this.controls.autoRotate = !this.dragging && now - this.lastInput > 20_000; // a slow showroom turn when idle
+      this.controls.update();
+    }
+    if (this.hoverRing) {
+      const at = this.hover && !this.hover.startsWith("w") && this.mids.get(this.hover);
+      this.hoverRing.visible = Boolean(at);
+      if (at) { this.hoverRing.position.copy(at).setY(0.03); this.hoverRing.scale.setScalar(1 + 0.06 * Math.sin(s * 5)); }
+    }
+    for (const ring of this.spots ?? []) {
+      const at = this.mids.get(ring.userData.id);
+      ring.visible = Boolean(at);
+      if (at) { ring.position.copy(at).setY(0.04); ring.scale.setScalar(1 + 0.12 * Math.sin(s * 6)); }
+    }
+    if (this.previewObj) this.previewObj.userData.material.opacity = 0.45 + 0.25 * Math.sin(s * 7);
+    for (const step of this.anim) step(s);
+    this.sparks = this.sparks.filter((spark) => {
+      const age = (now - spark.born) / 1000, position = spark.points.geometry.attributes.position;
+      if (age > 1.1) { this.world.remove(spark.points); spark.points.geometry.dispose(); spark.points.material.dispose(); return false; }
+      spark.velocity.forEach((v, i) => { v.y -= 9.8 * 0.016; position.setXYZ(i, position.getX(i) + v.x * 0.016, Math.max(0.05, position.getY(i) + v.y * 0.016), position.getZ(i) + v.z * 0.016); });
+      position.needsUpdate = true;
+      spark.points.material.opacity = 1 - age / 1.1;
+      return true;
+    });
     this.renderer.render(this.scene, this.camera);
   }
 
   start() {
     if (this.running) return;
     this.running = true;
-    const loop = (now) => { if (!this.running) return; this.frame(now / 1000); requestAnimationFrame(loop); };
-    requestAnimationFrame(loop);
+    this.renderer.setAnimationLoop((now) => this.frame(now / 1000)); // the same loop drives a VR headset
   }
-  stop() { this.running = false; }
+  stop() { this.running = false; this.renderer.setAnimationLoop(null); }
   dispose() { this.stop(); this.controls?.dispose(); this.renderer.dispose(); }
 }

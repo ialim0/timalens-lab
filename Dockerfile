@@ -1,7 +1,18 @@
 # syntax=docker/dockerfile:1.7
-# TimaLens Lab: one image with the FastAPI server, the static web app, Node (the lab checker) and ffmpeg.
+# TimaLens Lab: one image with the FastAPI server, the web app (a static Next.js export), Node (the
+# lab checker) and ffmpeg.
 
 ARG PYTHON_VERSION=3.12
+ARG NODE_VERSION=22
+
+# ---------------------------------------------------------------- web: build the Next.js app to static files
+FROM node:${NODE_VERSION}-slim AS web
+
+WORKDIR /src/frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend/ ./
+RUN npm run build
 
 # ---------------------------------------------------------------- build: install Python deps into a venv
 FROM python:${PYTHON_VERSION}-slim AS build
@@ -32,9 +43,12 @@ COPY --from=build /opt/venv /opt/venv
 
 WORKDIR /app
 COPY --chown=timalens:timalens app ./app
-COPY --chown=timalens:timalens web ./web
 COPY --chown=timalens:timalens samples ./samples
 COPY --chown=timalens:timalens tools ./tools
+# the web app, and the engine files the server's lab checker runs (the same ones the browser runs)
+COPY --from=web --chown=timalens:timalens /src/frontend/out ./frontend/out
+COPY --chown=timalens:timalens frontend/package.json ./frontend/package.json
+COPY --chown=timalens:timalens frontend/src/lab/circuit.js frontend/src/lab/labcheck.js ./frontend/src/lab/
 RUN mkdir -p /app/data && chown timalens:timalens /app/data
 
 ENV PATH="/opt/venv/bin:$PATH" \

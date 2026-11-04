@@ -32,7 +32,7 @@
   {"id": "discover", "title": "Discover Ohm's law", "preset": "ohm",
    "steps": [
     {"kind": "predict", "question": "If you double the battery's voltage, what happens to the current through the resistor?", "choices": ["It stays the same", "It doubles", "It halves"], "answer": 1, "why": "U = R × I: with R fixed, I is proportional to U."},
-    {"kind": "measure", "instruction": "Change the battery's voltage (tap the battery) and record at least 4 measurements of U and I with the “Record measurement” button.", "points": 4},
+    {"kind": "measure", "instruction": "Tap the battery and change its voltage a few times: each new value adds a point to the U(I) curve.", "points": 4},
     {"kind": "observe", "question": "Do the points make a straight line through the origin? What is its slope?"}
    ],
    "takeaway": "U and I are proportional: the slope of the line U = f(I) is the resistance, here about 100 Ω."},

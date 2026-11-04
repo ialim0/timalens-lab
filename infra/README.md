@@ -44,6 +44,8 @@ key) lives in a private bucket instead of a laptop.
 - **One instance.** Lab generation runs as a background job tracked in memory, so the
   service is capped at one instance with CPU always on. One instance with 2 vCPUs serves a
   classroom comfortably. Scaling out would need a shared job store (Redis, Firestore).
+- **Tima's live voice** uses a WebSocket (`/api/live`), which Cloud Run supports. A connection lasts at most the request
+  timeout (15 minutes); the page reconnects on its own. For Voxtral's voice, also `export TF_VAR_mistral_api_key=...`.
 - **32 MB request limit.** Cloud Run caps HTTP/1 request bodies at 32 MB, below the app's
   own 50 MB upload limit. Large lesson recordings must be trimmed. Video conversion only
   serves browsers without WebCodecs, so it is rarely needed.

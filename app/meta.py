@@ -115,13 +115,16 @@ def transcribe(cfg: Settings, wav: Path, *, language: str | None = None) -> str:
     request: dict[str, Any] = {"mode": "ENDPOINTING", "model": cfg.asr_model, "audioEncoding": "WAV"}
     if language:
         request["languageBias"] = [language]
-    with wav.open("rb") as audio:
-        response = httpx.post(
-            f"{cfg.base_url.rstrip('/')}/asr/transcribe",
-            headers={"Authorization": f"Bearer {cfg.api_key}"},
-            files={"request": (None, json.dumps(request), "application/json"), "audio": (wav.name, audio)},
-            timeout=600,
-        )
+    try:
+        with wav.open("rb") as audio:
+            response = httpx.post(
+                f"{cfg.base_url.rstrip('/')}/asr/transcribe",
+                headers={"Authorization": f"Bearer {cfg.api_key}"},
+                files={"request": (None, json.dumps(request), "application/json"), "audio": (wav.name, audio)},
+                timeout=600,
+            )
+    except httpx.HTTPError as exc:
+        raise MetaError(f"the Meta Model API is unreachable ({type(exc).__name__})") from exc
     if response.status_code != 200:
         raise MetaError(f"Muse Voice Transcribe answered {response.status_code}: {response.text[:300]}")
     body = response.json()

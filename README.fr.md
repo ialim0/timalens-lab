@@ -1,4 +1,4 @@
-<p><img src="web/img/timalens-logo.png" alt="TimaLens" height="40"></p>
+<p><img src="frontend/public/img/timalens-logo.png" alt="TimaLens" height="40"></p>
 
 # TimaLens Lab
 
@@ -35,10 +35,10 @@ Le tuteur répond à partir de ce cours, avec les valeurs du circuit de l'élèv
    - défis avec objectifs ;
    - quiz, formules, erreurs fréquentes ;
    - vue 2D ou 3D.
-3. **Le moteur de circuits vérifie tout** (`web/js/labcheck.js`). Il résout chaque circuit et explore les réglages que l'élève peut toucher, pour prouver que chaque défi est faisable sans être déjà réussi au départ. Chaque problème repart vers Muse Spark en mots simples, jusqu'à 3 fois.
+3. **Le moteur de circuits vérifie tout** (`frontend/src/lab/labcheck.js`). Il résout chaque circuit et explore les réglages que l'élève peut toucher, pour prouver que chaque défi est faisable sans être déjà réussi au départ. Chaque problème repart vers Muse Spark en mots simples, jusqu'à 3 fois.
 4. **L'élève expérimente.** Le même moteur tourne dans son navigateur.
 
-**L'IA configure le labo ; elle ne calcule jamais la physique.** Chaque tension, intensité et éclat vient de `web/js/circuit.js`, un solveur déterministe :
+**L'IA configure le labo ; elle ne calcule jamais la physique.** Chaque tension, intensité et éclat vient de `frontend/src/lab/circuit.js`, un solveur déterministe :
 
 - analyse nodale modifiée ;
 - piles avec résistance interne ;
@@ -56,7 +56,7 @@ Le tuteur répond à partir de ce cours, avec les valeurs du circuit de l'élèv
   - les multimètres affichent la valeur calculée.
 
   Muse Spark choisit la vue d'ouverture selon le cours ; le professeur peut l'imposer et l'élève peut toujours changer.
-- **Vidéo** : chaque séance est enregistrée comme un journal de quelques Ko. La vidéo est recalculée image par image à partir de ce journal, avec le même moteur et le même dessin, puis encodée en MP4 H.264 (WebCodecs), prête pour WhatsApp. Le rejeu est exact, un élève en 2G envoie 5 Ko au lieu de 10 Mo, et le professeur peut regénérer la vidéo de n'importe quel élève (`replay.html?session=…`).
+- **Vidéo** : chaque séance est enregistrée comme un journal de quelques Ko. La vidéo est recalculée image par image à partir de ce journal, avec le même moteur et le même dessin, puis encodée en MP4 H.264 (WebCodecs), prête pour WhatsApp. Le rejeu est exact, un élève en 2G envoie 5 Ko au lieu de 10 Mo, et le professeur peut regénérer la vidéo de n'importe quel élève (`/replay?session=…`).
 
 ## Modèles Meta utilisés
 
@@ -91,18 +91,18 @@ cp .env.example .env        # y mettre MODEL_API_KEY (clé de la Meta Model API)
 docker compose up --build   # http://localhost:8080
 ```
 
-**Sans Docker** (Python 3.10+, Node 18+, ffmpeg) :
+**Sans Docker** (Python 3.10+, Node 20+, ffmpeg) :
 
 ```bash
 make install
 cp .env.example .env        # y mettre MODEL_API_KEY
-make dev                    # http://localhost:8080
+make dev                    # l'API sur :8080 et l'app sur http://localhost:3000
 ```
 
 Exemples sans clé :
 
-- `/lab.html?lab=sample-ohm-fr` (ou `-en`) : la loi d'Ohm et la DEL, en 2D ;
-- `/lab.html?lab=sample-lampes-fr` (ou `-en`) : lampes en série et en dérivation, en 3D.
+- `/lab?lab=sample-ohm-fr` (ou `-en`) : la loi d'Ohm et la DEL, en 2D ;
+- `/lab?lab=sample-lampes-fr` (ou `-en`) : lampes en série et en dérivation, en 3D.
 
 Ajoute `&lang=fr` ou `&lang=en` à l'adresse pour choisir la langue de l'interface.
 

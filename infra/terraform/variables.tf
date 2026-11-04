@@ -32,6 +32,13 @@ variable "model_api_key" {
   sensitive   = true
 }
 
+variable "mistral_api_key" {
+  description = "Optional Mistral API key, for Tima's Voxtral voice. Empty: the browser's voice speaks. Pass it with TF_VAR_mistral_api_key."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "env" {
   description = "Extra, non-secret settings for the app (e.g. PLANNER_MODEL, PLANNER_EFFORT, PLANNER_BASE_URL)."
   type        = map(string)

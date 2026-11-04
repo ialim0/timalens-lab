@@ -1,7 +1,7 @@
 // The circuit engine against hand-worked answers.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkLayout, layout, meets, solve, format } from "../web/js/circuit.js";
+import { checkLayout, layout, meets, solve, format } from "../frontend/src/lab/circuit.js";
 
 const close = (actual, expected, tolerance, what) =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${what}: ${actual} is not ${expected} ± ${tolerance}`);

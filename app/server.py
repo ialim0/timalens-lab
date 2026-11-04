@@ -8,7 +8,9 @@ The Meta key stays here, on the server (MODEL_API_KEY); the browser never sees i
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -17,24 +19,39 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from openai import APIError as ModelAPIError
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
+from starlette.middleware.gzip import GZipMiddleware
 
-from app import generate, lesson, tutor
+from app import generate, lesson, tutor, voice
 from app.config import ROOT, settings
 from app.meta import MetaError, read_pages, transcribe
 
-WEB = ROOT / "web"
+# the web app: a static Next.js export (frontend/), built by `make build` or the Dockerfile
+WEB = Path(os.environ.get("WEB_DIR", ROOT / "frontend" / "out"))
 # hand-written labs, each in French and in English
 SAMPLE_LABS = {"sample-ohm": "ohm", "sample-lampes": "lampes"}
 SAMPLES = {f"{key}-{lang}": ROOT / "samples" / f"{name}_{lang}.lab.json" for key, name in SAMPLE_LABS.items() for lang in ("fr", "en")}
 MAX_UPLOAD = 50 * 1024 * 1024
 SAFE_ID = re.compile(r"^[a-z0-9-]{3,64}$")
+BENCH_PICTURE = re.compile(r"^data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
+MAX_PICTURE = 3_000_000  # characters of base64: a screenshot of the bench, not a photo album
 
 app = FastAPI(title="TimaLens Lab")
+app.add_middleware(GZipMiddleware, minimum_size=1024)  # phones on 2G; Tima's streamed answers are left as they are
+
+
+@app.middleware("http")
+async def cache_built_assets(request: Request, call_next):
+    """The app's scripts and styles have their content's hash in their name: a phone keeps them for good."""
+    response = await call_next(request)
+    if request.url.path.startswith("/_next/static/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 jobs: dict[str, dict[str, Any]] = {}
 
 
@@ -73,7 +90,8 @@ def read_lab(lab_id: str) -> tuple[dict[str, Any], str]:
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     cfg = settings()
-    return {"meta_key": bool(cfg.api_key), "planner": cfg.planner_model, "open_weight_planner": cfg.planner_is_open_weight}
+    return {"meta_key": bool(cfg.api_key), "planner": cfg.planner_model, "open_weight_planner": cfg.planner_is_open_weight,
+            "live_ears": bool(cfg.api_key), "voice": "voxtral" if cfg.tts_api_key else "browser"}
 
 
 @app.get("/api/labs/{lab_id}")
@@ -205,16 +223,75 @@ class TutorQuestion(BaseModel):
     history: list[dict[str, str]] = []
     context: dict[str, Any] = {}
     language: str = ""
+    image: str = ""  # the student's bench, as a data URL, for Muse Spark's vision
+
+
+def _tutor_call(lab_id: str, body: TutorQuestion) -> tuple[dict[str, Any], dict[str, Any]]:
+    lab, lesson_text = read_lab(lab_id)
+    if body.image and (len(body.image) > MAX_PICTURE or not BENCH_PICTURE.match(body.image)):
+        raise HTTPException(400, "the bench picture must be a JPEG, PNG or WebP data URL of at most 3 MB")
+    args = {"lab": lab, "lesson": lesson_text, "question": body.question, "history": body.history, "context": body.context,
+            "language": body.language, "image": body.image}
+    return lab, args
 
 
 @app.post("/api/labs/{lab_id}/tutor")
 def ask_tutor(lab_id: str, body: TutorQuestion) -> dict[str, str]:
-    lab, lesson_text = read_lab(lab_id)
+    _, args = _tutor_call(lab_id, body)
     try:
-        answer = tutor.answer(settings(), lab, lesson_text, body.question, body.history, body.context, language=body.language)
-    except MetaError as exc:
+        return {"answer": tutor.answer(settings(), **args)}
+    except (MetaError, ModelAPIError) as exc:
         raise HTTPException(503, str(exc)) from exc
-    return {"answer": answer}
+
+
+@app.post("/api/labs/{lab_id}/tutor/stream")
+def ask_tutor_streaming(lab_id: str, body: TutorQuestion) -> StreamingResponse:
+    """The tutor's answer as server-sent events: {"delta"} as it is written, then {"done"}."""
+    _, args = _tutor_call(lab_id, body)
+    parts = tutor.stream(settings(), **args)
+    try:
+        first = next(parts, "")  # a missing key fails here, as a proper 503
+    except (MetaError, ModelAPIError) as exc:
+        raise HTTPException(503, str(exc)) from exc
+
+    def events():
+        try:
+            for delta in itertools.chain([first], parts):
+                if delta:
+                    yield f"data: {json.dumps({'delta': delta}, ensure_ascii=False)}\n\n"
+            yield 'data: {"done": true}\n\n'
+        except Exception as exc:  # the student hears what was said so far, then the engine's fallback
+            yield f"data: {json.dumps({'error': str(exc)[:200]})}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})
+
+
+# ---------------------------------------------------------------- Tima's live voice
+@app.websocket("/api/live")
+async def live_ears(ws: WebSocket) -> None:
+    """The microphone, relayed to Muse Voice Transcribe realtime; transcripts come back."""
+    await ws.accept()
+    start = await ws.receive_json()
+    await voice.relay(ws, settings(), str(start.get("language", "fr")))
+    await ws.close()
+
+
+class SpeakRequest(BaseModel):
+    text: str
+    language: str = "fr"
+
+
+@app.post("/api/tts")
+async def tts(body: SpeakRequest) -> Response:
+    """One sentence of Tima's, spoken by Voxtral. 503 tells the browser to use its own voice."""
+    text = body.text.strip()[:600]
+    if not text:
+        raise HTTPException(400, "nothing to say")
+    try:
+        audio = await voice.speak(settings(), text, body.language)
+    except voice.VoiceError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    return Response(audio, media_type="audio/mpeg", headers={"Cache-Control": "no-store"})
 
 
 # ---------------------------------------------------------------- sessions: a student's lab, replayable
@@ -288,10 +365,41 @@ async def transcribe_question(audio: UploadFile = File(...), language: str = For
             raise HTTPException(503, str(exc)) from exc
 
 
+# ---------------------------------------------------------------- the pages
+NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>TimaLens Lab</title>
+<p style="font:16px system-ui;margin:40px">The web app is not built yet: run <code>make build</code>,
+or <code>make dev</code> and open <a href="http://localhost:3000">localhost:3000</a>.</p>"""
+
+
+def page(name: str) -> Response:
+    path = WEB / f"{name}.html"
+    return FileResponse(path) if path.exists() else HTMLResponse(NOT_BUILT, status_code=503)
+
+
 @app.get("/")
-def home() -> FileResponse:
-    return FileResponse(WEB / "index.html")
+def home() -> Response:
+    return page("index")
+
+
+@app.get("/lab")
+def lab_page() -> Response:
+    return page("lab")
+
+
+@app.get("/replay")
+def replay_page() -> Response:
+    return page("replay")
+
+
+@app.get("/{name}.html")
+def old_page(name: str, request: Request) -> RedirectResponse:
+    """Links shared before the Next.js app (lab.html?lab=…, replay.html?session=…) still work."""
+    if name not in ("index", "lab", "replay"):
+        raise HTTPException(404, "no such page")
+    target = "/" if name == "index" else f"/{name}"
+    return RedirectResponse(f"{target}?{request.url.query}" if request.url.query else target, status_code=301)
 
 
 app.mount("/samples", StaticFiles(directory=ROOT / "samples"), name="samples")
-app.mount("/", StaticFiles(directory=WEB), name="web")
+if WEB.exists():
+    app.mount("/", StaticFiles(directory=WEB), name="web")

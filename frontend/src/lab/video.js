@@ -7,13 +7,13 @@
 // browser without WebCodecs records the same frames with MediaRecorder instead.
 import { format, normalise, solve } from "./circuit.js";
 import { LIGHT, boardSvg, chargeAt, chargePaths, px, standaloneSvg } from "./board.js";
-import { ArrayBufferTarget, Muxer } from "../vendor/mp4-muxer/mp4-muxer.mjs";
+import { ArrayBufferTarget, Muxer } from "mp4-muxer";
 
 const FPS = 24, W = 1280, H = 720;
 const AREA = { x: 24, y: 84, w: 800, h: 590 }; // the circuit
 const PANEL = { x: 848, y: 84, w: 408, h: 590 }; // what is happening
 const C = { ...LIGHT, ground: "#f3f5f9", card: "#ffffff", line: "#dde2ec", ok: "#1f9456", okBg: "#e3f3ea", warnBg: "#fdecea", tutorBg: "#e7f0ff" };
-const LOGO = new URL("../img/timalens-logo.png", import.meta.url).href;
+const LOGO = "/img/timalens-logo.png"; // served from public/
 
 // ---------------------------------------------------------------- the timeline
 /** The session as segments of video: each with a duration and what to show. */
@@ -305,7 +305,8 @@ async function pickEncoder() {
   return null;
 }
 
-/** The video of a session: { blob, type, extension, seconds }. view: "2d" or "3d". */
+/** The video of a session: { blob, type, extension, seconds }. view: "2d" or "3d".
+ *  @param {{ lab?: any, session?: any, t?: any, view?: string, onProgress?: (done: number) => void, signal?: AbortSignal }} [options] */
 export async function renderVideo({ lab, session, t, view = "2d", onProgress = () => {}, signal } = {}) {
   const { segments, duration } = timeline(session, lab, t);
   const painter = new Painter(lab, t, view);

@@ -2,8 +2,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { checkLab, presetCircuit, achievable } from "../web/js/labcheck.js";
-import { solve } from "../web/js/circuit.js";
+import { checkLab, presetCircuit, achievable } from "../frontend/src/lab/labcheck.js";
+import { solve } from "../frontend/src/lab/circuit.js";
 
 const sample = JSON.parse(readFileSync(new URL("../samples/ohm_fr.lab.json", import.meta.url), "utf8"));
 const copy = () => structuredClone(sample);

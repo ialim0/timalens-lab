@@ -3,6 +3,7 @@ these run offline. The real models are exercised by running the app with MODEL_A
 
 from __future__ import annotations
 
+import asyncio
 import copy
 import json
 import shutil
@@ -11,7 +12,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
-from app import generate, lesson, server, tutor
+from app import generate, lesson, server, tutor, voice
 from app.config import ROOT, settings
 
 SAMPLE = json.loads((ROOT / "samples" / "ohm_fr.lab.json").read_text())
@@ -137,6 +138,28 @@ def test_the_tutor_sees_the_lesson_and_the_circuit(monkeypatch):
     assert "0.06" in seen["messages"][-1]["content"] and "Ohm" in seen["messages"][1]["content"]
 
 
+def test_the_tutor_sees_the_bench(monkeypatch):
+    seen = {}
+
+    class Fake:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kw):
+                    seen.update(kw)
+                    msg = type("M", (), {"content": "Je vois L1 allumée."})
+                    return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+    monkeypatch.setattr(tutor, "_client", lambda cfg, planner=False: Fake)
+    client = TestClient(server.app)
+    picture = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+    r = client.post("/api/labs/sample-lampes-fr/tutor", json={"question": "Tu vois quoi ?", "image": picture})
+    assert r.status_code == 200
+    content = seen["messages"][-1]["content"]
+    assert content[0]["type"] == "text" and content[1]["image_url"]["url"] == picture
+    assert client.post("/api/labs/sample-lampes-fr/tutor", json={"question": "?", "image": "javascript:alert(1)"}).status_code == 400
+
+
 def test_the_tutor_without_a_key_says_so(monkeypatch):
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
     monkeypatch.delenv("PLANNER_BASE_URL", raising=False)
@@ -144,13 +167,20 @@ def test_the_tutor_without_a_key_says_so(monkeypatch):
     assert r.status_code == 503 and "MODEL_API_KEY" in r.json()["detail"]
 
 
-def test_pages_are_served():
-    client = TestClient(server.app)
-    home = client.get("/").text
-    assert 'data-i18n="create"' in home and "timalens-logo.png" in home
-    assert client.get("/img/timalens-logo.png").headers["content-type"] == "image/png"
-    assert client.get("/lab.html").status_code == 200
+def test_pages_and_old_links():
+    client = TestClient(server.app, follow_redirects=False)
     assert client.get("/samples/ohm_fr.lab.json").status_code == 200
+    old = client.get("/lab.html?lab=sample-ohm-en")  # links shared before the Next.js app
+    assert old.status_code == 301 and old.headers["location"] == "/lab?lab=sample-ohm-en"
+    assert client.get("/replay.html?session=abc").headers["location"] == "/replay?session=abc"
+    assert client.get("/secret.html").status_code == 404
+    home = client.get("/")
+    if (server.WEB / "index.html").exists():  # built: the static Next.js export is served
+        assert home.status_code == 200 and "TimaLens" in home.text
+        assert client.get("/lab").status_code == 200 and client.get("/replay").status_code == 200
+        assert client.get("/img/timalens-logo.png").headers["content-type"] == "image/png"
+    else:
+        assert home.status_code == 503 and "make build" in home.text
 
 
 # ---------------------------------------------------------------- sessions, video, 3D
@@ -166,7 +196,6 @@ def test_a_session_is_saved_and_replayed():
     assert saved.status_code == 200
     back = client.get(f"/api/sessions/{saved.json()['id']}").json()
     assert back["session"]["events"][1]["U"] == 6 and back["lab"]["title"] == SAMPLE["title"]
-    assert client.get("/replay.html").status_code == 200
 
 
 def test_bad_sessions_are_refused():
@@ -264,3 +293,99 @@ def test_the_tutor_answers_in_the_students_language(monkeypatch):
     monkeypatch.setattr(tutor, "_client", lambda cfg, planner=False: Fake)
     TestClient(server.app).post("/api/labs/sample-ohm-fr/tutor", json={"question": "Why?", "language": "en"})
     assert any(m["role"] == "developer" and "Answer in English" in m["content"] for m in seen["messages"])
+
+
+# ---------------------------------------------------------------- Tima's live voice
+def test_the_tutor_streams_its_answer(monkeypatch):
+    def chunk(text):
+        delta = type("D", (), {"content": text})
+        return type("K", (), {"choices": [type("C", (), {"delta": delta})]})
+
+    class Fake:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kw):
+                    assert kw["stream"] is True
+                    return iter([chunk("Regarde L1. "), chunk("Que vois-tu ?")])
+
+    monkeypatch.setattr(tutor, "_client", lambda cfg, planner=False: Fake)
+    r = TestClient(server.app).post("/api/labs/sample-lampes-fr/tutor/stream", json={"question": "Pourquoi ?"})
+    events = [json.loads(line[6:]) for line in r.text.splitlines() if line.startswith("data: ")]
+    assert "".join(e.get("delta", "") for e in events) == "Regarde L1. Que vois-tu ?" and events[-1] == {"done": True}
+
+
+def test_the_streaming_tutor_without_a_key_says_so(monkeypatch):
+    monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    monkeypatch.delenv("PLANNER_BASE_URL", raising=False)
+    assert TestClient(server.app).post("/api/labs/sample-ohm-fr/tutor/stream", json={"question": "?"}).status_code == 503
+
+
+def test_without_a_voice_key_the_browser_speaks(monkeypatch):
+    monkeypatch.delenv("MISTRAL_API_KEY", raising=False)
+    client = TestClient(server.app)
+    assert client.get("/api/health").json()["voice"] == "browser"
+    assert client.post("/api/tts", json={"text": "Bonjour"}).status_code == 503
+
+
+def test_tima_speaks_with_voxtral(monkeypatch):
+    async def speak(cfg, text, language):
+        return b"ID3-mp3:" + text.encode()
+
+    monkeypatch.setattr(voice, "speak", speak)
+    r = TestClient(server.app).post("/api/tts", json={"text": "Bravo !", "language": "fr"})
+    assert r.headers["content-type"] == "audio/mpeg" and r.content.endswith(b"Bravo !")
+
+
+def test_the_live_ears_relay_audio_and_transcripts(monkeypatch):
+    monkeypatch.setenv("MODEL_API_KEY", "test-key")
+    sent = []
+
+    class FakeMeta:  # Muse Voice Transcribe's realtime endpoint, as the relay sees it
+        def __init__(self):
+            self.events = [{"sessionId": "s1"}]
+            self.spoken = asyncio.Event()
+
+        async def send(self, data):
+            sent.append(data)
+            if isinstance(data, bytes):  # audio in: the student speaks
+                self.events += [{"type": "speechStart", "turnId": "t1"}, {"type": "transcript", "turnId": "t1", "transcript": "hey Tima"},
+                                {"type": "speechComplete", "turnId": "t1", "transcript": "hey Tima pourquoi"}]
+                self.spoken.set()
+
+        async def recv(self):
+            return json.dumps(self.events.pop(0))
+
+        def __aiter__(self):
+            return self
+
+        async def __anext__(self):
+            while not self.events:
+                self.spoken.clear()
+                await self.spoken.wait()
+            return json.dumps(self.events.pop(0))
+
+        async def close(self):
+            pass
+
+    async def connect(cfg):
+        return FakeMeta()
+
+    monkeypatch.setattr(voice, "connect", connect)
+    with TestClient(server.app).websocket_connect("/api/live") as ws:
+        ws.send_json({"language": "fr"})
+        assert ws.receive_json() == {"type": "ready"}
+        ws.send_bytes(b"\x00\x00" * 1920)
+        events = [ws.receive_json() for _ in range(3)]
+        ws.send_text('{"type": "stop"}')
+    handshake = json.loads(sent[0])
+    assert handshake["audioEncoding"] == "PCM_24KHZ" and handshake["authorization"]["accessToken"] == "Bearer test-key" and "Tima" in handshake["keywords"]
+    assert handshake["languageBias"][0] == "French" and isinstance(sent[1], bytes)
+    assert events[-1] == {"type": "speechComplete", "turnId": "t1", "transcript": "hey Tima pourquoi"}
+
+
+def test_the_live_ears_need_a_key(monkeypatch):
+    monkeypatch.delenv("MODEL_API_KEY", raising=False)
+    with TestClient(server.app).websocket_connect("/api/live") as ws:
+        ws.send_json({"language": "en"})
+        assert ws.receive_json()["type"] == "error"

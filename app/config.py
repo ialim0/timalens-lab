@@ -3,6 +3,9 @@
 Meta's hosted models (api.meta.ai) need MODEL_API_KEY. The planner can instead run on an
 open-weight model (Muse Spark Open, or Muse Glimmer) served behind any OpenAI-compatible
 endpoint, such as vLLM: set PLANNER_BASE_URL (and PLANNER_API_KEY if it wants one).
+
+Tima's live voice: Muse Voice Transcribe's realtime endpoint listens (same key), and Voxtral
+TTS (Mistral) speaks when MISTRAL_API_KEY is set; without it, the browser's voice speaks.
 """
 
 from __future__ import annotations
@@ -27,6 +30,13 @@ class Settings:
     planner_model: str = field(default_factory=lambda: _env("PLANNER_MODEL", "muse-spark-1.3"))
     planner_effort: str = field(default_factory=lambda: _env("PLANNER_EFFORT", "medium"))
     asr_model: str = field(default_factory=lambda: _env("ASR_MODEL", "muse-voice-transcribe-1.0"))
+    asr_realtime_url: str = field(default_factory=lambda: _env("ASR_REALTIME_URL", "wss://api.meta.ai/v1/asr/realtime"))
+    # Tima's voice (Voxtral TTS); voices are picked per language, or set here
+    tts_api_key: str = field(default_factory=lambda: _env("MISTRAL_API_KEY"))
+    tts_base_url: str = field(default_factory=lambda: _env("TTS_BASE_URL", "https://api.mistral.ai/v1"))
+    tts_model: str = field(default_factory=lambda: _env("TTS_MODEL", "voxtral-mini-tts-3-0"))
+    tts_voice_fr: str = field(default_factory=lambda: _env("TTS_VOICE_FR"))
+    tts_voice_en: str = field(default_factory=lambda: _env("TTS_VOICE_EN"))
     # Open weights: an OpenAI-compatible server for the planner (e.g. vLLM serving Muse Spark Open)
     planner_base_url: str = field(default_factory=lambda: _env("PLANNER_BASE_URL"))
     planner_api_key: str = field(default_factory=lambda: _env("PLANNER_API_KEY"))

@@ -1,9 +1,11 @@
 """The lab's tutor: Muse Spark, grounded in the teacher's lesson and in what the student's
-circuit is doing right now (the engine's numbers, never invented ones)."""
+circuit is doing right now (the engine's numbers, never invented ones). With a picture of the
+student's bench, Muse Spark's vision also sees how they built it."""
 
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from typing import Any
 
 from app.config import Settings
@@ -25,14 +27,20 @@ How you help:
   their own circuit contradicts it.
 - If something is dangerous in real life (a short circuit, a burnt LED), say why, briefly.
 - Stay on the lesson and the lab.
+- You may also get a picture of the student's bench (the schematic or the 3D table). Use it to
+  see what they built and where things are, and name the parts by their labels (R1, L2...).
+  For any number, trust the engine's values over what the picture seems to show.
+- You are Tima, and your answer is spoken aloud: no lists, no markdown, no formulas in LaTeX.
 """
 
 
 LANGUAGES = {"fr": "French", "en": "English"}
 
 
-def answer(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
-           history: list[dict[str, str]], context: dict[str, Any], *, language: str = "") -> str:
+def _request(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
+             history: list[dict[str, str]], context: dict[str, Any], *, language: str = "", image: str = "") -> dict[str, Any]:
+    """The chat request: rules, lesson, conversation, then the question with the solved circuit
+    (and, when given, a data URL picture of the student's bench)."""
     grounding = {
         "lesson_title": lab.get("title"), "summary": lab.get("summary"), "objectives": lab.get("objectives"),
         "formulas": lab.get("formulas"), "misconceptions": lab.get("misconceptions"),
@@ -48,9 +56,33 @@ def answer(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
     if speak:  # the student chose the interface's language: answer in it, whatever the lesson's
         messages.append({"role": "developer", "content": f"Answer in {speak}, using the usual school words of {speak}."})
     circuit = json.dumps(context, ensure_ascii=False)[:12000]
-    messages.append({"role": "user", "content": f"{question}\n\n[The student's circuit, as the lab's engine solved it: {circuit}]"})
+    text = f"{question}\n\n[The student's circuit, as the lab's engine solved it: {circuit}]"
+    if image:  # Muse Spark's vision looks at the bench, as the student sees it right now
+        text += "\n[A picture of the student's bench, as it is on their screen, is attached.]"
+        content: Any = [{"type": "text", "text": text}, {"type": "image_url", "image_url": {"url": image}}]
+    else:
+        content = text
+    messages.append({"role": "user", "content": content})
     kwargs: dict[str, Any] = {"model": cfg.planner_model, "messages": messages}
     if not cfg.planner_is_open_weight:
         kwargs["reasoning_effort"] = "low"  # a tutor answers fast
+    return kwargs
+
+
+def answer(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
+           history: list[dict[str, str]], context: dict[str, Any], *, language: str = "", image: str = "") -> str:
+    """Muse Spark's whole answer."""
+    kwargs = _request(cfg, lab, lesson, question, history, context, language=language, image=image)
     reply = _client(cfg, planner=True).chat.completions.create(**kwargs)
     return (reply.choices[0].message.content or "").strip()
+
+
+def stream(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
+           history: list[dict[str, str]], context: dict[str, Any], *, language: str = "", image: str = "") -> Iterator[str]:
+    """Muse Spark's answer as it is written: Tima starts speaking its first sentence at once."""
+    kwargs = _request(cfg, lab, lesson, question, history, context, language=language, image=image)
+    client = _client(cfg, planner=True)  # raises MetaError before anything is streamed
+    for chunk in client.chat.completions.create(**kwargs, stream=True):
+        delta = chunk.choices[0].delta.content if chunk.choices else None
+        if delta:
+            yield delta

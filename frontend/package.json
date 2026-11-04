@@ -1,0 +1,30 @@
+{
+  "name": "timalens-lab-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TimaLens Lab's web app: the teacher's page, the student's lab and the replay, as a static Next.js export served by the FastAPI server.",
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "mp4-muxer": "5.2.2",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5.9"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

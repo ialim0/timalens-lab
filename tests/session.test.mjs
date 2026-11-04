@@ -3,11 +3,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { Session } from "../web/js/session.js";
-import { timeline } from "../web/js/video.js";
-import { boardSvg, chargePaths, resistorBands, standaloneSvg } from "../web/js/board.js";
-import { layout, normalise, solve } from "../web/js/circuit.js";
-import { strings } from "../web/js/i18n.js";
+import { Session } from "../frontend/src/lab/session.js";
+import { timeline } from "../frontend/src/lab/video.js";
+import { boardSvg, chargePaths, resistorBands, standaloneSvg } from "../frontend/src/lab/board.js";
+import { layout, normalise, solve } from "../frontend/src/lab/circuit.js";
+import { strings } from "../frontend/src/lab/i18n.js";
 
 const lab = JSON.parse(readFileSync(new URL("../samples/ohm_fr.lab.json", import.meta.url), "utf8"));
 const circuit = () => layout(lab.presets[0]).components.map(normalise);
