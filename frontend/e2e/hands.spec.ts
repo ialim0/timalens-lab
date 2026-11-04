@@ -54,6 +54,18 @@ test.describe("hands", () => {
     await expect(page.locator("#inspector h3")).toContainText("Bulb");
   });
 
+  test("holding still on a button lights it up, then clicks it", async ({ page }) => {
+    await openLab(page, "lab=sample-lampes-en&lang=en&view=2d");
+    await startHands(page);
+    const mission = page.locator("[data-activity]").first();
+    const box = (await mission.boundingBox())!;
+    await handAt(page, box.x + box.width / 2, box.y + box.height / 2, "point", 10);
+    await expect(mission).toHaveClass(/hand-hover/);
+    await page.waitForTimeout(1100); // holding still
+    await handAt(page, box.x + box.width / 2, box.y + box.height / 2, "point", 2);
+    await expect(page.locator(".mission-head h2")).toHaveText("Light a bulb");
+  });
+
   test("a fist held a moment wakes Tima; an open hand lights up its gesture", async ({ page }) => {
     await fakeVoice(page);
     await openLab(page, "lab=sample-lampes-en&lang=en&view=2d", { voice: true });

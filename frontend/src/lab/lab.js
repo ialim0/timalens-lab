@@ -66,6 +66,8 @@ async function loadLab() {
   $("#hint").textContent = state.t.place_hint;
   $("#finish").textContent = state.t.finish;
   $("#hands").title = $("#hands").ariaLabel = state.t.hands;
+  $("#tour").title = $("#tour").ariaLabel = state.t.tour;
+  fillDock();
   state.session = new Session(state.labId, lab);
   buildToolbar();
   buildTabs();
@@ -836,8 +838,9 @@ function showIntro() {
     setTimeout(() => { intro.hidden = true; }, 650);
     tima.start({ quiet });
     bench3d?.flyIn();
-    tima.say(voice.welcome(state.lab, missionCount()));
     if (!quiet) tima.toggleWake(true);
+    if (toured()) tima.say(voice.welcome(state.lab, missionCount()));
+    else setTimeout(guidedTour, 900); // after the camera's swoop: a first visit gets the tour
   };
   $("#intro-start").onclick = () => open(false);
   $("#intro-quiet").onclick = () => open(true);
@@ -903,9 +906,34 @@ function pick3d(id, point) {
   recompute();
 }
 $("#view-switch").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
+// ---------------------------------------------------------------- the guided tour
+const TOUR_KEY = "timalens-tour-done";
+const toured = () => { try { return localStorage.getItem(TOUR_KEY) === "1"; } catch { return true; } };
+let touring = false;
+async function guidedTour() {
+  if (touring) return;
+  touring = true;
+  const { runTour } = await import("./tour.js");
+  await tima?.sayAndWait(voice.tour_intro, { interrupt: true });
+  const finished = await runTour({ steps: voice.tour, tima, t: state.t });
+  try { localStorage.setItem(TOUR_KEY, "1"); } catch { /* private window: the tour comes back next time */ }
+  if (finished) tima?.say(voice.tour_end(missionCount()));
+  touring = false;
+}
+$("#tour").addEventListener("click", () => { tima?.start(); guidedTour(); });
+
+// ---------------------------------------------------------------- the dock: the other labs, and the teacher's page
+async function fillDock() {
+  let labs = [];
+  try { labs = await (await fetch(`/api/labs?lang=${state.ui}`)).json(); } catch { /* offline: the teacher's link still shows */ }
+  $("#dock").innerHTML = `<span class="dock-title">${esc(state.t.labs)}</span>`
+    + labs.map((l) => `<a class="dock-lab ${l.id === state.labId ? "current" : ""}" href="/lab?lab=${encodeURIComponent(l.id)}">${l.cover ? `<img src="${esc(l.cover)}" alt="">` : ""}<span>${esc(l.title)}</span><span class="pill">${l.view === "3d" ? "3D" : "2D"}</span></a>`).join("")
+    + `<a class="dock-teach" href="/teach">＋ ${esc(state.t.teach)}</a>`;
+}
+
 // ---------------------------------------------------------------- hands (the webcam, tracked in the browser)
 let hands = null;
-const GESTURES = ["pinch", "open", "fist"];
+const GESTURES = ["point", "pinch", "open", "fist"];
 async function toggleHands() {
   const button = $("#hands"), view = $("#hand-view");
   if (hands) {
@@ -923,7 +951,7 @@ async function toggleHands() {
     const control = new HandControl({
       video: $("#hand-video"), sketch: $("#hand-sketch"), cursor: $("#hand-cursor"),
       onRotate: (dx, dy) => bench3d?.turn(dx, dy),
-      onTalk: () => tima?.tap(),
+      onTalk: () => tima?.talk(),
       onGesture: (g) => { for (const chip of $("#gestures").children) chip.classList.toggle("on", chip.dataset.g === g); },
     });
     view.hidden = false;

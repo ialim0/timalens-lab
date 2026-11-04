@@ -24,8 +24,9 @@ const STRINGS = {
     video_failed: "La vidéo n'a pas pu être créée sur cet appareil :", replay_title: "Revoir un labo", open_file: "Ouvrir un fichier de labo",
     content_in: "Le contenu de ce labo est en {lang}.", translate: "Traduire en français", translating: "Muse Spark traduit le labo…", translate_failed: "La traduction n'a pas pu être faite :",
     lang_names: { fr: "français", en: "anglais" },
+    labs: "Laboratoires", teach: "Professeur ? Crée un labo depuis ton cours", tour: "Visite guidée", tour_next: "Suivant", tour_skip: "Passer",
     hands: "Mains", hands_failed: "La caméra ou le suivi des mains n'a pas pu démarrer :",
-    g_pinch: "Pincer · attraper", g_open: "Main ouverte · tourner", g_fist: "Poing · parler à Tima",
+    g_point: "Index · viser, rester = cliquer", g_pinch: "Pincer · attraper", g_open: "Main ouverte · tourner", g_fist: "Poing · parler à Tima",
   },
   en: {
     tools: "Tools", select: "Select", wire: "Wire", erase: "Eraser", reset: "Start over", electrons: "Electrons", conventional: "Conventional current",
@@ -51,8 +52,9 @@ const STRINGS = {
     video_failed: "The video could not be made on this device:", replay_title: "Watch a lab again", open_file: "Open a lab file",
     content_in: "This lab's content is in {lang}.", translate: "Translate into English", translating: "Muse Spark is translating the lab…", translate_failed: "The translation could not be made:",
     lang_names: { fr: "French", en: "English" },
+    labs: "Labs", teach: "Teacher? Make a lab from your lesson", tour: "Guided tour", tour_next: "Next", tour_skip: "Skip",
     hands: "Hands", hands_failed: "The camera or hand tracking could not start:",
-    g_pinch: "Pinch · grab", g_open: "Open hand · turn", g_fist: "Fist · talk to Tima",
+    g_point: "Point · aim, hold still = click", g_pinch: "Pinch · grab", g_open: "Open hand · turn", g_fist: "Fist · talk to Tima",
   },
 };
 

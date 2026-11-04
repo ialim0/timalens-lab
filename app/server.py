@@ -108,21 +108,29 @@ def health() -> dict[str, Any]:
             "live_ears": bool(cfg.api_key), "voice": "voxtral" if cfg.tts_api_key else "browser", "meta_reachable": reachable(meta)}
 
 
-_reach: dict[str, tuple[float, bool]] = {}
+_reach: dict[str, tuple[float, bool | None]] = {}
+_checking: set[str] = set()
 
 
-def reachable(host: str, port: int = 443) -> bool:
-    """Can this server open a connection to the model API? Checked at most once a minute."""
+def reachable(host: str, port: int = 443) -> bool | None:
+    """Can this server open a connection to the model API? The last answer (None until the first
+    one), checked again in the background at most once a minute: the health check never waits."""
     if not host:
         return False
-    at, ok = _reach.get(host, (0.0, False))
-    if time.monotonic() - at > 60:
-        try:
-            socket.create_connection((host, port), timeout=3).close()
-            ok = True
-        except OSError:
-            ok = False
-        _reach[host] = (time.monotonic(), ok)
+    at, ok = _reach.get(host, (0.0, None))
+    if time.monotonic() - at > 60 and host not in _checking:
+        _checking.add(host)
+
+        def check() -> None:
+            try:
+                socket.create_connection((host, port), timeout=3).close()
+                result = True
+            except OSError:
+                result = False
+            _reach[host] = (time.monotonic(), result)
+            _checking.discard(host)
+
+        threading.Thread(target=check, daemon=True).start()
     return ok
 
 
@@ -526,6 +534,11 @@ def lab_page() -> Response:
 @app.get("/replay")
 def replay_page() -> Response:
     return page("replay")
+
+
+@app.get("/teach")
+def teach_page() -> Response:
+    return page("teach")
 
 
 @app.get("/{name}.html")

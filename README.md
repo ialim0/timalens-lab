@@ -153,6 +153,10 @@ make dev                    # the API on :8080 and the web app on http://localho
 
 `make serve` builds the web app and runs everything as in production on http://localhost:8080.
 
+The address opens a lab straight away (the bulbs, in 3D), with a short **guided tour by Tima** on a
+first visit (the **?** button replays it). The other labs are in the small menu at the bottom, with
+the way to the **teacher's page** (`/teach`), where a lesson becomes a lab.
+
 No key yet? The two hand-written sample labs work without one:
 
 - `/lab?lab=sample-ohm-en` (or `-fr`): Ohm's law and the LED, opens in 2D;
@@ -214,7 +218,7 @@ of them, builds and smoke-tests the Docker image, and validates the Terraform.
 ```
 app/          FastAPI server: Meta model calls, lesson reading, lab design loop, tutor, Tima's voice
 frontend/     the web app (Next.js, exported as static files the server serves)
-  src/app/    the pages: / (teacher), /lab (student), /replay (a saved session's video)
+  src/app/    the pages: / (opens a lab), /lab (the student's lab), /teach (a lesson in, a lab out), /replay
   src/components/  React: the teacher's page, the lab's layout, the replay
   src/lab/    circuit.js (engine) · labcheck.js (checker) · board.js (2D) · bench3d.js (3D)
               tima.js + voice.js (Tima) · session.js (event log) · video.js (frames → MP4) · lab.js (the bench)

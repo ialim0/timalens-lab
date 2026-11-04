@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 
 test.describe("the teacher's page", () => {
   test("is calm: one headline, one action, the rest folded away", async ({ page }) => {
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     await expect(page.getByRole("heading", { level: 1 })).toContainText("experiencing");
     await expect(page.getByRole("button", { name: "Create the lab" })).toBeVisible();
     await expect(page.locator("textarea")).toHaveCount(0);
@@ -18,7 +18,7 @@ test.describe("the teacher's page", () => {
   });
 
   test("speaks French too", async ({ page }) => {
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     await page.getByRole("button", { name: "FR" }).click();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("vit");
     await expect(page.getByRole("button", { name: "Créer le laboratoire" })).toBeVisible();
@@ -26,12 +26,12 @@ test.describe("the teacher's page", () => {
 
   test("warns before a teacher waits for nothing, when Meta cannot be reached", async ({ page }) => {
     await page.route("**/api/health", (route) => route.fulfill({ json: { meta_key: true, meta_reachable: false, live_ears: true, voice: "browser" } }));
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     await expect(page.locator(".notice")).toContainText("Meta's API can't be reached from this network");
   });
 
   test("asks for a lesson before making a lab", async ({ page }) => {
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     await page.getByRole("button", { name: "Create the lab" }).click();
     await expect(page.locator(".error[role=alert]")).toContainText("paste a few paragraphs"); // not Next.js's route announcer
   });
@@ -56,7 +56,7 @@ test.describe("the teacher's page", () => {
       return route.fulfill({ json: { answer: "Your lesson insists on U equals R times I." } });
     });
 
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     await page.locator('input[type="file"]').setInputFiles("../samples/lecon_loi_ohm.pdf");
     await page.getByRole("button", { name: "Create the lab" }).click();
 
@@ -78,23 +78,23 @@ test.describe("the teacher's page", () => {
     // the lab opens by itself, and Tima speaks there at once: no second tap
     await expect(page).toHaveURL(/\/lab\?lab=sample-ohm-en$/, { timeout: 15_000 });
     await expect(page.locator("#intro")).toBeHidden();
-    await expect.poll(() => said(page)).toContain("Hi, I'm Tima, your lab guide.");
+    await expect.poll(async () => (await said(page)).some((line) => line.startsWith("Hi, I'm Tima"))).toBe(true); // a first visit: her tour
   });
 
   test("the teacher can stay on the page instead", async ({ page }) => {
     await page.route("**/api/labs", (route) => (route.request().method() === "POST" ? route.fulfill({ json: { job: "j2" } }) : route.fallback()));
     await page.route("**/api/jobs/j2", (route) => route.fulfill({ json: { stage: "ready", lab: "sample-ohm-en", events: [{ kind: "reused" }, { kind: "ready", lab: "sample-ohm-en" }] } }));
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     await page.locator('input[type="file"]').setInputFiles("../samples/lecon_loi_ohm.pdf");
     await page.getByRole("button", { name: "Create the lab" }).click();
     await page.getByRole("button", { name: "Stay here" }).click();
     await expect(page.getByRole("heading", { name: "Your lab is ready" })).toBeVisible();
     await expect(page.locator(".linkbox code")).toContainText("/lab?lab=sample-ohm-en");
-    await expect(page).toHaveURL(/\/\?lang=en$/);
+    await expect(page).toHaveURL(/\/teach\?lang=en$/);
   });
 
   test("lists the sample labs, which open", async ({ page }) => {
-    await page.goto("/?lang=en");
+    await page.goto("/teach?lang=en");
     const labs = page.locator(".labs a");
     await expect(labs).toHaveCount(2);
     await labs.first().click();

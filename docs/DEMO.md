@@ -3,7 +3,7 @@
 **Before you start**
 
 - Start the server with `MODEL_API_KEY` set.
-- Run `make serve` (or deploy), open `http://localhost:8080` on a laptop, and the sample lab on a phone.
+- Run `make serve` (or deploy). Open `/teach` on a laptop (the teacher's page) and `/` on a phone (it opens a lab, with Tima's tour on a first visit).
 - The interface follows the browser's language. For an English-speaking jury, use the **EN** switch (top right) or add `?lang=en`. To show the French classroom version, tap **FR**: everything switches, including the lab's content.
 - Upload `samples/lecon_loi_ohm.pdf` once the day before. Labs are reused by lesson, so re-uploading it on stage is instant even if the venue's Wi-Fi is bad. To show a live generation as well, also upload a second lesson that has not been uploaded before.
 

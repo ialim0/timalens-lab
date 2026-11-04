@@ -18,6 +18,7 @@ export default function LabView() {
         <div className="lesson-title" id="lab-title">…</div>
         <div className="origin" id="lab-origin" />
         <div id="lang-switch" />
+        <button type="button" className="btn help" id="tour" aria-label="?">?</button>
         <button type="button" className="btn hands" id="hands" aria-pressed="false" title="Hands">✋</button>
         <button type="button" className="btn vr" id="vr" hidden>VR</button>
         <div className="seg" role="group" id="view-switch">
@@ -50,6 +51,9 @@ export default function LabView() {
           <div className="tab-body" id="tab-body" />
         </aside>
       </main>
+
+      {/* the other labs, small, at the bottom; and the way to the teacher's page */}
+      <nav className="dock" id="dock" aria-label="Labs" />
 
       <dialog id="finish-dialog" className="sheet" />
 

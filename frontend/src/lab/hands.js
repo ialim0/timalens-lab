@@ -3,7 +3,8 @@
 // pointer events a mouse makes, so taking parts from the tray, dropping them on the bench,
 // moving them and tapping buttons all work by hand, in 2D and in 3D, without new code paths.
 //
-//   point ☝  the cursor follows the index finger
+//   point ☝  the cursor follows the index finger; the button under it lights up, and holding
+//            still on it for a moment clicks it (a ring fills): the easiest click for a beginner
 //   pinch 🤏  grab / release (a short pinch is a tap)
 //   open ✋   move the open hand to turn the 3D bench
 //   fist ✊   held a moment: "Tima, I'm talking to you"
@@ -15,6 +16,10 @@ const REACH = 0.15; // the camera's outer 15% maps past the screen edge: easier 
 const SMOOTH = 0.45; // how far the cursor moves towards the finger each frame
 const FIST_MS = 700;
 const TAP_PX = 14, TAP_MS = 700;
+const DWELL_MS = 1000; // holding still on a button this long clicks it
+// what a hand may click by holding still: buttons and links, never the bench (that is what pinching is for)
+const CLICKABLE = "button, a[href], [role=tab], select, label, input[type=checkbox], .choice, .activity, [data-g]";
+const BENCH = "#board, #bench3d, .stage";
 
 export const BONES = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12],
   [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [0, 17], [17, 18], [18, 19], [19, 20]];
@@ -78,6 +83,7 @@ export class HandControl {
   stop() {
     this.running = false;
     if (this.down) this.release();
+    this.dwell(null);
     this.stream?.getTracks().forEach((track) => track.stop());
     this.tracker?.close();
     this.cursor.hidden = true;
@@ -88,6 +94,7 @@ export class HandControl {
     this.draw(points);
     if (!points) {
       if (this.down) this.release();
+      this.dwell(null);
       this.cursor.hidden = true;
       this.palm = null;
       this.onGesture("none");
@@ -106,6 +113,7 @@ export class HandControl {
     if (pinched && !this.down) this.press();
     else if (!pinched && this.down) this.release();
     else this.send("pointermove", this.under());
+    this.dwell(pinched ? null : this.under().closest?.(CLICKABLE));
 
     if (gesture === "open" && !this.down) { // the open hand turns the bench, like a hand on a turntable
       const palm = points[MIDDLE_KNUCKLE];
@@ -118,6 +126,24 @@ export class HandControl {
       if (!this.fistFired && performance.now() - this.fistSince > FIST_MS) { this.fistFired = true; this.onTalk(); }
     } else { this.fistSince = null; this.fistFired = false; }
     this.onGesture(pinched ? "pinch" : gesture);
+  }
+
+  /** The button under the cursor lights up; held still on it, a ring fills, then it is clicked. */
+  dwell(button) {
+    if (button?.closest(BENCH)) button = null;
+    const now = performance.now();
+    if (button !== this.hovered) {
+      this.hovered?.classList.remove("hand-hover");
+      button?.classList.add("hand-hover");
+      Object.assign(this, { hovered: button, hoverSince: now, dwelt: false });
+    }
+    const done = button && !this.dwelt ? Math.min(1, (now - this.hoverSince) / DWELL_MS) : 0;
+    this.cursor.style.setProperty("--dwell", done.toFixed(3));
+    if (done >= 1) {
+      this.dwelt = true; // once per visit: leave the button and come back to click it again
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX: this.x, clientY: this.y }));
+      button.focus?.();
+    }
   }
 
   // ---------------------------------------------------------------- the pointer events a mouse would make

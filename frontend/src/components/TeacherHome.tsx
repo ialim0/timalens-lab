@@ -130,7 +130,14 @@ function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
   }, [lang, M]); // `tima` and `note` never change
   const tima = useTima(root, lang, askTima);
   useEffect(() => {
-    fetch("/api/health").then((r) => r.json()).then((h) => setOffline(h.meta_key && h.meta_reachable === false)).catch(() => {});
+    let alive = true;
+    const ask = (again: boolean) => fetch("/api/health").then((r) => r.json()).then((h) => {
+      if (!alive) return;
+      setOffline(h.meta_key && h.meta_reachable === false);
+      if (again && h.meta_reachable == null) setTimeout(() => ask(false), 4000); // the server is still finding out
+    }).catch(() => {});
+    ask(true);
+    return () => { alive = false; };
   }, []);
   const cancelled = useRef(false); // the teacher chose to stay on this page
 

@@ -60,7 +60,18 @@ const LINES = {
     burnt: (id) => `Oups, ${id} a grillé : trop de courant. Augmente la résistance, puis répare-la.`,
     lit: (name, id) => `${name} ${id} s'allume !`,
     hint: (h) => `Un petit indice : ${h}`,
-    hands: "Je vois ta main ! Pince le pouce et l'index pour attraper une pièce. Ouvre la main pour tourner le banc. Et ferme le poing pour me parler.",
+    tour_intro: "Bonjour, je suis Tima, ton guide. Je te fais visiter le labo en une minute.",
+    tour: [
+      { at: ".stage", say: "Voici ton banc. Le circuit est vrai : le moteur physique calcule chaque tension et chaque courant." },
+      { at: "#toolbar", say: "Pour construire, glisse une pièce d'ici jusqu'au banc. Touche une pièce posée pour la régler." },
+      { at: ".panel", say: "Tes missions sont ici : des expériences guidées, des défis, et un quiz." },
+      { at: "#view-switch", say: "Passe de la 2D à la 3D quand tu veux. En 3D, fais tourner le banc." },
+      { at: "#hands", say: "Tu peux aussi tout faire avec tes mains, devant la caméra : touche ce bouton." },
+      { at: "#tima", say: "Et moi, je suis toujours là. Dis « Hey Tima », ou touche-moi, pour poser une question." },
+      { at: "#dock", say: "En bas, les autres labos. Et un professeur peut créer le sien à partir de son cours." },
+    ],
+    tour_end: (n) => `C'est parti ! Tu as ${n} missions. Choisis la première quand tu veux.`,
+    hands: "Je vois ta main ! Vise avec l'index : reste un instant sur un bouton pour cliquer. Pince le pouce et l'index pour attraper une pièce. Ouvre la main pour tourner le banc. Et ferme le poing pour me parler.",
   },
   en: {
     welcome: (lab, n) => `Hi, I'm Tima, your lab guide. Welcome to “${lab.title}”. ${firstSentence(lab.summary)} You have ${n} missions. Pick the first one whenever you like. And if you have a question, just say: Hey Tima.`,
@@ -79,7 +90,18 @@ const LINES = {
     burnt: (id) => `Oops, ${id} burnt out: too much current. Raise the resistance, then repair it.`,
     lit: (name, id) => `${name} ${id} lights up!`,
     hint: (h) => `A little hint: ${h}`,
-    hands: "I can see your hand! Pinch your thumb and index finger to grab a part. Open your hand to turn the bench. And make a fist to talk to me.",
+    tour_intro: "Hi, I'm Tima, your guide. Let me show you around the lab in a minute.",
+    tour: [
+      { at: ".stage", say: "This is your bench. The circuit is real: the physics engine computes every voltage and every current." },
+      { at: "#toolbar", say: "To build, drag a part from here onto the bench. Tap a part on the bench to adjust it." },
+      { at: ".panel", say: "Your missions are here: guided experiments, challenges, and a quiz." },
+      { at: "#view-switch", say: "Switch between 2D and 3D whenever you like. In 3D, turn the bench around." },
+      { at: "#hands", say: "You can also do everything with your hands, in front of the camera: tap this button." },
+      { at: "#tima", say: "And I'm always here. Say “Hey Tima”, or tap me, to ask a question." },
+      { at: "#dock", say: "Down here are the other labs. And a teacher can make their own from a lesson." },
+    ],
+    tour_end: (n) => `Let's go! You have ${n} missions. Pick the first one whenever you like.`,
+    hands: "I can see your hand! Aim with your index finger: hold still on a button to click it. Pinch your thumb and index finger to grab a part. Open your hand to turn the bench. And make a fist to talk to me.",
   },
 };
 export const lines = (lang) => LINES[lang] ?? LINES.en;
@@ -154,7 +176,17 @@ export class Tima {
     else if (!this.muted) this.mouth.prefetch(this.queue[0]);
   }
 
+  /** Say something, and know when it has been said. */
+  sayAndWait(text, { interrupt = false } = {}) {
+    if (!this.ready) return Promise.resolve();
+    if (interrupt) this.hush(); // first: hushing her ends whatever was waiting on her before
+    return new Promise((done) => { this.waiters = [...(this.waiters ?? []), done]; this.say(text); if (!this.speaking) this.idle(); });
+  }
+
+  idle() { const waiters = this.waiters ?? []; this.waiters = []; waiters.forEach((done) => done()); }
+
   hush() {
+    this.idle();
     this.epoch += 1;
     this.queue = [];
     this.followUp = false;
@@ -174,6 +206,7 @@ export class Tima {
       this.quietAt = Date.now(); // the microphone may still hand back her last words for a moment
       this.onSentence("");
       if (this.followUp) { this.followUp = false; this.attend(FOLLOW_UP_MS, { quiet: true }); }
+      this.idle();
       clearTimeout(this.hideTimer);
       this.hideTimer = setTimeout(() => { if (!this.speaking && !this.awake) this.bubble.hidden = true; }, 4500);
       return;
@@ -195,6 +228,13 @@ export class Tima {
   async tap() {
     if (this.speaking) { this.hush(); return; }
     if (this.awake) { this.sleep(); return; }
+    if (!this.wakeOn) await this.toggleWake(true);
+    if (this.wakeOn) this.attend(9000);
+  }
+
+  /** "Tima, I'm talking to you" (a fist, in hand mode): she stops speaking and listens. */
+  async talk() {
+    this.hush();
     if (!this.wakeOn) await this.toggleWake(true);
     if (this.wakeOn) this.attend(9000);
   }

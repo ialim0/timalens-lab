@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { dragTo, openLab } from "./fixtures";
+import { dragTo, fakeVoice, openLab, said } from "./fixtures";
 
 const parts = (page: import("@playwright/test").Page) => page.locator("#board #parts > g").count();
 
@@ -61,5 +61,34 @@ test.describe("the student's lab", () => {
     await expect(page.locator(".choice.right")).toHaveCount(1);
     await page.getByRole("button", { name: "Finish" }).click();
     await expect(page.getByRole("heading", { name: "Your lab is done!" })).toBeVisible();
+  });
+});
+
+test.describe("a first visit", () => {
+  test("the address opens a lab, with the other labs and the teacher's page at the bottom", async ({ page }) => {
+    await page.goto("/?lang=en");
+    await expect(page).toHaveURL(/\/lab\?lab=sample-lampes-en&lang=en$/);
+    await expect(page.locator("#intro-title")).toHaveText("Bulbs in series and in parallel");
+    await expect(page.locator("#dock .dock-lab")).toHaveCount(2);
+    await expect(page.locator("#dock .dock-lab.current")).toContainText("Bulbs in series");
+    await page.locator("#intro-quiet").click();
+    await page.locator("#dock .dock-teach").click();
+    await expect(page).toHaveURL(/\/teach$/);
+    await expect(page.getByRole("button", { name: /Create the lab|Créer le laboratoire/ })).toBeVisible();
+  });
+
+  test("Tima shows the student around, part by part, then once is enough", async ({ page }) => {
+    await fakeVoice(page, { sentenceMs: 2500 }); // a sentence takes seconds to say: the tour waits for each
+    await openLab(page, "lab=sample-lampes-en&lang=en&view=2d", { voice: true, tour: true });
+    await expect.poll(() => said(page)).toContain("Hi, I'm Tima, your guide.");
+    await expect(page.locator(".tour-card")).toContainText("This is your bench.");
+    await expect(page.locator(".tour-card")).toContainText("To build, drag a part", { timeout: 15_000 }); // the next part, once she has said it
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.locator(".tour-card")).toContainText("Your missions are here");
+    await page.getByRole("button", { name: "Skip" }).click();
+    await expect(page.locator(".tour-card")).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem("timalens-tour-done"))).toBe("1");
+    await page.locator("#tour").click(); // the ? replays it
+    await expect(page.locator(".tour-card")).toContainText("This is your bench.");
   });
 });
