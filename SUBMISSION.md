@@ -24,6 +24,10 @@ as one link (or on WhatsApp), that works on a $50 phone.
 - **Students build real DC circuits** by dragging parts onto a bench, in 2D or in an immersive
   3D world (and in **VR on a Meta Quest**). Bulbs glow with the right brightness, LEDs burn out
   with sparks, meters show real readings.
+- **Students can drive the lab with their hands.** With the ✋ button, the webcam tracks the
+  hand **in the browser** (MediaPipe: the video never leaves the computer): pinch to grab a part
+  and drop it on the bench, open the hand to turn the 3D bench, make a fist to talk to Tima.
+  Hands and voice together: no mouse, no keyboard.
 - **Tima guides each student by voice**: she explains the missions, reacts to what the circuit
   does, wakes on "Hey Tima", **looks at the student's bench** before answering, and lights up
   the parts she is talking about.
@@ -61,7 +65,10 @@ without a key, the browser's own voice speaks.
   frame by the same engine (WebCodecs), so a teacher on 2G can receive a student's lab.
 - **Built to ship**: Next.js static export served by FastAPI in one container, Terraform for
   Google Cloud Run (Secret Manager, a least-privilege service account, a GCS volume), GitHub
-  Actions running **20 end-to-end tests in Chrome**, 37 server tests and 22 engine tests.
+  Actions running **22 end-to-end tests in Chrome** (including hand tracking), 37 server tests and 25 engine tests.
+- **Hands as a pointer**: gestures (pinch, open hand, fist) classified from MediaPipe's 21 landmarks,
+  scale-invariant, with hysteresis; they become the same pointer events a mouse makes, so every
+  interaction of the lab works by hand without a second code path.
 
 ## Try it
 

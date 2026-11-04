@@ -181,7 +181,22 @@ export class Bench3D {
   /** Any input: the showroom rotation waits until the student has been still a while. */
   poke() { this.lastInput = performance.now(); }
   /** While a part is in the student's hand, the camera holds still. */
-  holdControls(on) { if (this.controls) this.controls.enabled = !on; }
+  holdControls(on) { if (this.controls) this.controls.enabled = !(on || this.byHand); }
+  /** Hands drive the bench (hands.js): the mouse's orbit controls step aside, turn() turns it. */
+  setHands(on) { this.byHand = on; this.holdControls(false); }
+  /** Turn the camera around the bench: dx to the side, dy up or down (radians). */
+  turn(dx, dy) {
+    if (!this.controls) return;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const around = new THREE.Spherical().setFromVector3(offset);
+    around.theta -= dx;
+    around.phi = Math.min(this.controls.maxPolarAngle, Math.max(0.15, around.phi - dy));
+    offset.setFromSpherical(around);
+    this.camera.position.copy(this.controls.target).add(offset);
+    this.camera.lookAt(this.controls.target);
+    this.intro = null;
+    this.poke();
+  }
   setDragging(on) {
     this.dragging = on;
     this.holdControls(on);

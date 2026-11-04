@@ -60,6 +60,7 @@ const LINES = {
     burnt: (id) => `Oups, ${id} a grillé : trop de courant. Augmente la résistance, puis répare-la.`,
     lit: (name, id) => `${name} ${id} s'allume !`,
     hint: (h) => `Un petit indice : ${h}`,
+    hands: "Je vois ta main ! Pince le pouce et l'index pour attraper une pièce. Ouvre la main pour tourner le banc. Et ferme le poing pour me parler.",
   },
   en: {
     welcome: (lab, n) => `Hi, I'm Tima, your lab guide. Welcome to “${lab.title}”. ${firstSentence(lab.summary)} You have ${n} missions. Pick the first one whenever you like. And if you have a question, just say: Hey Tima.`,
@@ -78,6 +79,7 @@ const LINES = {
     burnt: (id) => `Oops, ${id} burnt out: too much current. Raise the resistance, then repair it.`,
     lit: (name, id) => `${name} ${id} lights up!`,
     hint: (h) => `A little hint: ${h}`,
+    hands: "I can see your hand! Pinch your thumb and index finger to grab a part. Open your hand to turn the bench. And make a fist to talk to me.",
   },
 };
 export const lines = (lang) => LINES[lang] ?? LINES.en;

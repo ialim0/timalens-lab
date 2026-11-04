@@ -18,6 +18,7 @@ export default function LabView() {
         <div className="lesson-title" id="lab-title">…</div>
         <div className="origin" id="lab-origin" />
         <div id="lang-switch" />
+        <button type="button" className="btn hands" id="hands" aria-pressed="false" title="Hands">✋</button>
         <button type="button" className="btn vr" id="vr" hidden>VR</button>
         <div className="seg" role="group" id="view-switch">
           <button type="button" data-view="2d" aria-pressed="true">2D</button>
@@ -51,6 +52,14 @@ export default function LabView() {
       </main>
 
       <dialog id="finish-dialog" className="sheet" />
+
+      {/* hand mode: the camera view with the hand's skeleton, the gestures, and the hand's cursor */}
+      <div className="hand-view" id="hand-view" hidden>
+        <video id="hand-video" muted playsInline />
+        <canvas id="hand-sketch" width={320} height={240} />
+        <div className="gestures" id="gestures" />
+      </div>
+      <div className="hand-cursor" id="hand-cursor" hidden />
 
       <div className="intro" id="intro" hidden>
         <img className="intro-cover" id="intro-cover" alt="" hidden />

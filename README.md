@@ -71,6 +71,8 @@ Students who have never seen a lab need someone beside them. **Tima** is a glowi
 - **She sees.** Every question carries a picture of the bench, the 3D table or the schematic, to **Muse Spark's vision**, alongside the engine's numbers, so she can say what the student actually built. The **Look** button asks her what she sees and what to try next. While she talks about a part ("look at L1"), it glows on the bench.
 - **She never invents a number.** What she says about the circuit comes from the engine; answers come from the grounded tutor. She speaks with the browser's own voices, so she is free and works offline once the page is loaded. Mute her and her words stay as captions.
 
+**Hands, through the webcam.** The ✋ button turns on hand tracking, in the browser (MediaPipe; the video never leaves the computer): a cursor follows the index finger, a **pinch** grabs and drops parts, an **open hand** turns the 3D bench, a **fist** wakes Tima. Gestures become ordinary pointer events, so everything in the lab works by hand.
+
 The bench is hands-on: **drag a part from the tray onto the bench**, in 2D or 3D; a glowing beam shows where it will land. Pick a placed part up to move it, or drop it off the bench to take it away; the circuit is re-solved the moment it leaves or lands. Measurements take themselves: change a value and each new reading becomes a point of the U(I) graph. On a **Meta Quest**, the **VR** button puts the bench in front of the student (WebXR).
 
 ## One engine, three views

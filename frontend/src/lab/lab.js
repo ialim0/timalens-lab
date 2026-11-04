@@ -65,6 +65,7 @@ async function loadLab() {
   $("#electrons-label").textContent = state.t.electrons;
   $("#hint").textContent = state.t.place_hint;
   $("#finish").textContent = state.t.finish;
+  $("#hands").title = $("#hands").ariaLabel = state.t.hands;
   state.session = new Session(state.labId, lab);
   buildToolbar();
   buildTabs();
@@ -877,6 +878,7 @@ async function setView(next) {
     try {
       const { Bench3D } = await import("./bench3d.js");
       bench3d = new Bench3D(canvas, { onPick: pick3d });
+      bench3d.setHands(Boolean(hands));
     } catch (error) { console.error(error); return; } // no WebGL: stay in 2D
   }
   state.view = next;
@@ -901,6 +903,45 @@ function pick3d(id, point) {
   recompute();
 }
 $("#view-switch").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
+// ---------------------------------------------------------------- hands (the webcam, tracked in the browser)
+let hands = null;
+const GESTURES = ["pinch", "open", "fist"];
+async function toggleHands() {
+  const button = $("#hands"), view = $("#hand-view");
+  if (hands) {
+    hands.stop();
+    hands = window.timalensHands = null;
+    bench3d?.setHands(false);
+    view.hidden = true;
+    button.setAttribute("aria-pressed", "false");
+    return;
+  }
+  button.disabled = true;
+  try {
+    const { HandControl } = await import("./hands.js");
+    $("#gestures").innerHTML = GESTURES.map((g) => `<span data-g="${g}">${esc(state.t[`g_${g}`])}</span>`).join("");
+    const control = new HandControl({
+      video: $("#hand-video"), sketch: $("#hand-sketch"), cursor: $("#hand-cursor"),
+      onRotate: (dx, dy) => bench3d?.turn(dx, dy),
+      onTalk: () => tima?.tap(),
+      onGesture: (g) => { for (const chip of $("#gestures").children) chip.classList.toggle("on", chip.dataset.g === g); },
+    });
+    view.hidden = false;
+    await control.start();
+    hands = window.timalensHands = control; // the end-to-end tests feed it hands
+    bench3d?.setHands(true);
+    button.setAttribute("aria-pressed", "true");
+    tima?.say(voice.hands, { interrupt: true });
+  } catch (error) {
+    view.hidden = true;
+    console.warn("hands", error);
+    tima?.say(`${state.t.hands_failed} ${error.message ?? error}`, { interrupt: true });
+  } finally {
+    button.disabled = false;
+  }
+}
+$("#hands").addEventListener("click", toggleHands);
+
 $("#vr").addEventListener("click", async () => {
   await setView("3d");
   try { await bench3d?.enterVR(); } catch (error) { console.error(error); }
