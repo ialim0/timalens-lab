@@ -59,6 +59,9 @@ circuits behave as they do in life. Bulbs glow with the right brightness. LEDs b
 sparks, when the current is too high, and are repaired with a tap. Mistakes cost nothing, and
 teach everything.
 
+<p align="center"><img src="docs/images/session.gif" alt="A real session: the student turns the 3D bench with his hand in front of the webcam while Tima explains the series circuit" width="720"><br>
+<sub>A real session on lab.timalens.com: the bench turns with the student's hand, Tima explains, and the lab films it all.</sub></p>
+
 | A guided tour on first visit | Tima answers, and points at what she means |
 |---|---|
 | ![Tima's guided tour lights up each part of the lab](docs/images/tour.png) | ![Tima answers a spoken question and the bulbs she names glow](docs/images/tima-points.png) |

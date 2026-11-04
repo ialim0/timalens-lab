@@ -50,6 +50,9 @@ où les circuits se comportent comme dans la vie. Les lampes brillent avec le bo
 grillent, avec des étincelles, quand le courant est trop fort, et se réparent d'un geste. Les erreurs
 ne coûtent rien, et apprennent tout.
 
+<p align="center"><img src="docs/images/session.gif" alt="A real session: the student turns the 3D bench with his hand in front of the webcam while Tima explains the series circuit" width="720"><br>
+<sub>Une vraie séance sur lab.timalens.com : la paillasse tourne avec la main de l'élève, Tima explique, et le labo filme tout.</sub></p>
+
 ## Les fonctionnalités
 
 - **Tout cours, tout format**, lu par Muse Spark (vision pour les photos) et Muse Voice Transcribe (enregistrements).

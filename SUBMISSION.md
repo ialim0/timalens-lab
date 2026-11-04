@@ -55,6 +55,8 @@ as one link (or on WhatsApp), that works on a $50 phone.
 - **Mistakes cost nothing.** A burnt LED sparks, smokes, and is repaired with a tap: the lesson
   a real bench teaches by destroying a component, without the cost.
 
+![A real session: the bench turns with the student's hand while Tima explains](docs/images/session.gif)
+
 ## Meta models, and what each one does
 
 | Model | Job |
