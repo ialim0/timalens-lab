@@ -101,7 +101,7 @@ The engine is tested against hand-worked answers. The same file runs in the stud
 
 | Model | Where | What for |
 |---|---|---|
-| `muse-spark-1.3` | `app/generate.py` | Designs the lab from the whole lesson, with JSON-schema structured output. Repairs it from the engine's feedback. |
+| `muse-spark-1.3` or `muse-wonder-1.0` | `app/generate.py` | Designs the lab from the whole lesson on the **Responses API**: structured output (`text.format`), and **reasoning summaries streamed** so Tima reads Muse Spark's thinking aloud to the teacher while it works. Repairs the lab from the engine's feedback. |
 | `muse-spark-1.3` (vision) | `app/tutor.py` | Tima, the voice tutor: grounded in the lesson and the live, solved circuit, and looking at a picture of the student's bench. |
 | `muse-spark-1.3` (vision) | `app/meta.py` `read_pages` | Reads photographed or scanned lessons: blackboards, notebooks, textbook pages, including circuit diagrams. |
 | `muse-spark-1.3` | `app/generate.py` `translate_lab` | Translates a lab (French ⇄ English, or a lab's content into Wolof, Hausa, Yorùbá, Fɔngbè, Kiswahili, Bamanankan). The structure must come back identical (ids, values, goals, answer indexes) and the engine re-checks it, so a translation can never change the physics or move a quiz answer. |
@@ -178,6 +178,8 @@ Settings are read from the environment (see [.env.example](.env.example)):
 | `META_BASE_URL` | Meta Model API base URL | `https://api.meta.ai/v1` |
 | `PLANNER_MODEL` | Model that designs the lab and tutors | `muse-spark-1.3` |
 | `PLANNER_EFFORT` | Reasoning effort for the design | `medium` |
+| `DESIGN_MODEL` | Model that designs the labs, e.g. `muse-wonder-1.0` | `PLANNER_MODEL` |
+| `TUTOR_MODEL` | Model that tutors, e.g. `muse-spark-1.3-contributor` | `PLANNER_MODEL` |
 | `ASR_MODEL` | Speech-to-text model | `muse-voice-transcribe-1.0` |
 | `PLANNER_BASE_URL`, `PLANNER_API_KEY` | Open-weight server (optional) | — |
 | `MISTRAL_API_KEY` | Tima's voice (Voxtral TTS); without it the browser's voice speaks | — |

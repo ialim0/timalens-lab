@@ -39,7 +39,7 @@ test.describe("the teacher's page", () => {
   test("Tima tells the story of the generation, answers questions, then opens the lab", async ({ page }) => {
     const steps = [
       [{ kind: "reading", source: "pdf" }, { kind: "read", chars: 4200, words: 700, title: "La loi d'Ohm" }],
-      [{ kind: "designing", attempt: 1 }],
+      [{ kind: "designing", attempt: 1 }, { kind: "thinking", text: "Two bulbs in series show the current is shared." }],
       [{ kind: "designed", title: "Ohm's law in the lab", circuits: 2, activities: 2, challenges: 2, view: "2d" }],
       [{ kind: "checking" }, { kind: "problems", count: 1 }, { kind: "designing", attempt: 2 }],
       [{ kind: "checking" }, { kind: "checked", count: 0 }, { kind: "ready", lab: "sample-ohm-en" }],
@@ -67,6 +67,7 @@ test.describe("the teacher's page", () => {
     await expect.poll(() => said(page)).toContain("Your lesson insists on U equals R times I.");
     expect(asked).toBe("What does my lesson insist on?");
 
+    await expect.poll(() => said(page)).toContain("Muse Spark is thinking: Two bulbs in series show the current is shared.");
     await expect.poll(() => said(page)).toContain("First draft: “Ohm's law in the lab”, with 2 circuits, 2 experiments and 2 challenges, in 2D.");
     await expect.poll(() => said(page)).toContain("The engine found 1 problem.");
     await expect.poll(() => said(page)).toContain("Everything checks out: every challenge can be met.");

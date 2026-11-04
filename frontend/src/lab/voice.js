@@ -70,8 +70,13 @@ export class LiveEars {
       const event = JSON.parse(data);
       if (event.type === "ready") { this.ready = true; this.retry = 0; this.on.ready?.(); }
       else if (event.type === "speechStart") this.on.speechStart?.();
-      else if (event.type === "transcript") this.on.partial?.(event.transcript ?? "");
-      else if (event.type === "speechComplete") this.on.final?.(event.transcript ?? "");
+      else if (event.type === "transcript" && !event.final) this.on.partial?.(event.transcript ?? "");
+      else if (event.type === "speechComplete" || (event.type === "transcript" && event.final)) {
+        // a turn may end both ways (a final transcript, then speechComplete): count it once
+        if (event.turnId && event.turnId === this.lastTurn) return;
+        this.lastTurn = event.turnId;
+        this.on.final?.(event.transcript ?? "");
+      }
       else if (event.type === "error") { this.failed = event.message; this.on.error?.(event.message); }
     };
     socket.onclose = () => {

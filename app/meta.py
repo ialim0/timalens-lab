@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -60,20 +61,54 @@ def _json_from(text: str) -> Any:
 
 
 def chat_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dict[str, Any] | None = None,
-              name: str = "answer", effort: str | None = None) -> Any:
+              name: str = "answer", effort: str | None = None, model: str | None = None,
+              on_thought: Callable[[str], None] | None = None) -> Any:
     """Ask Muse Spark (or the open-weight planner) for a JSON answer.
 
     With a schema, the reply is constrained to it (structured output); without one, the
-    JSON is taken from the reply.
+    JSON is taken from the reply. With on_thought, the request goes through the Responses API,
+    which streams summaries of the model's reasoning: on_thought gets each one as it is written.
     """
+    if on_thought is not None and not cfg.planner_is_open_weight:
+        return _thinking_json(cfg, messages, schema=schema, name=name, effort=effort, model=model, on_thought=on_thought)
     client = _client(cfg, planner=True)
-    kwargs: dict[str, Any] = {"model": cfg.planner_model, "messages": messages}
+    kwargs: dict[str, Any] = {"model": model or cfg.planner_model, "messages": messages}
     if schema is not None:
         kwargs["response_format"] = {"type": "json_schema", "json_schema": {"name": name, "schema": schema, "strict": False}}
     if not cfg.planner_is_open_weight:
         kwargs["reasoning_effort"] = effort or cfg.planner_effort
     reply = client.chat.completions.create(**kwargs)
     content = reply.choices[0].message.content or ""
+    try:
+        return _json_from(content)
+    except (json.JSONDecodeError, MetaError) as exc:
+        raise MetaError(f"the planner's reply was not JSON: {content[:300]}") from exc
+
+
+def _thinking_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dict[str, Any] | None, name: str,
+                   effort: str | None, model: str | None, on_thought: Callable[[str], None]) -> Any:
+    """The Responses API, streamed: reasoning summaries as they come, then the JSON answer.
+
+    Structured output is text.format here (response_format is the Chat Completions parameter),
+    and summaries arrive as response.reasoning_summary_text.done events. A summary is not
+    guaranteed for every response: without one, nothing is said.
+    """
+    kwargs: dict[str, Any] = {"model": model or cfg.planner_model, "input": messages,
+                              "reasoning": {"effort": effort or cfg.planner_effort, "summary": "auto"}, "stream": True}
+    if schema is not None:
+        kwargs["text"] = {"format": {"type": "json_schema", "name": name, "schema": schema, "strict": False}}
+    written, final = [], ""
+    for event in _client(cfg, planner=True).responses.create(**kwargs):
+        kind = getattr(event, "type", "")
+        if kind == "response.reasoning_summary_text.done" and getattr(event, "text", "").strip():
+            on_thought(event.text.strip())
+        elif kind == "response.output_text.delta":
+            written.append(event.delta)
+        elif kind == "response.completed":
+            final = getattr(event.response, "output_text", "") or ""
+        elif kind in ("response.failed", "error"):
+            raise MetaError(f"Muse Spark stopped: {getattr(event, 'message', None) or kind}")
+    content = "".join(written) or final
     try:
         return _json_from(content)
     except (json.JSONDecodeError, MetaError) as exc:

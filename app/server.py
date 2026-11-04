@@ -199,7 +199,8 @@ def _lesson_title(text: str) -> str:
     return ""
 
 
-def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, language: str, level: str, view: str = "auto") -> None:
+def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, language: str, level: str, view: str = "auto",
+                    ui: str = "") -> None:
     """Make the lab in the background. Each step goes into the job's events, as facts (not
     sentences): the teacher's page has Tima say them, in the teacher's language."""
     job = jobs[job_id]
@@ -236,7 +237,8 @@ def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, la
             job.update(stage="ready", lab=key, detail="already made from this lesson")
             note("ready", lab=key)
             return
-        lab = generate.lab_from_lesson(settings(), text, language=language, level=level, view=view, progress=progress, note=note)
+        lab = generate.lab_from_lesson(settings(), text, language=language, level=level, view=view, progress=progress, note=note,
+                                       teacher=tutor.LANGUAGES.get(ui[:2], ""))
         (labs_dir() / f"{key}.json").write_text(json.dumps({"lab": lab, "lesson": text[:200_000]}, ensure_ascii=False))
         job.update(stage="ready", lab=key)
         note("ready", lab=key, title=lab.get("title", ""))
@@ -250,7 +252,7 @@ def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, la
 
 @app.post("/api/labs")
 async def create_lab(file: UploadFile | None = File(None), text: str = Form(""), language: str = Form("auto"), level: str = Form(""),
-                     view: str = Form("auto")) -> dict[str, str]:
+                     view: str = Form("auto"), ui: str = Form("")) -> dict[str, str]:
     """Start making a lab; the teacher follows the job. Reading a photo or a recording takes
     a model call, so it happens in the job too."""
     upload: tuple[str, bytes] | None = None
@@ -263,7 +265,8 @@ async def create_lab(file: UploadFile | None = File(None), text: str = Form(""),
     job_id = uuid.uuid4().hex[:12]
     kind = Path(upload[0]).suffix.lower().lstrip(".") if upload else "text"
     jobs[job_id] = {"stage": "reading", "detail": upload[0] if upload else "", "events": [{"kind": "reading", "source": kind}]}
-    threading.Thread(target=_run_generation, args=(job_id, upload, text, language, level, view if view in ("2d", "3d") else "auto"), daemon=True).start()
+    view = view if view in ("2d", "3d") else "auto"
+    threading.Thread(target=_run_generation, args=(job_id, upload, text, language, level, view, ui), daemon=True).start()
     return {"job": job_id}
 
 

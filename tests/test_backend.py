@@ -460,3 +460,49 @@ def test_a_sentence_voxtral_refuses_is_a_one_off(monkeypatch):
     monkeypatch.setattr(voice, "speak", speak)
     r = TestClient(server.app).post("/api/tts", json={"text": "Bonjour"})
     assert r.status_code == 502  # not 503: the browser keeps Voxtral for the next sentences
+
+
+# ---------------------------------------------------------------- Muse Spark thinks aloud (Responses API)
+def test_the_lab_is_designed_on_the_responses_api_with_its_reasoning_read_aloud(monkeypatch):
+    from types import SimpleNamespace as Event
+
+    from app import meta
+
+    seen = {}
+    lab = json.dumps(SAMPLE)
+
+    class Fake:
+        class responses:
+            @staticmethod
+            def create(**kw):
+                seen.update(kw)
+                return iter([
+                    Event(type="response.reasoning_summary_text.delta", delta="Je pars"),
+                    Event(type="response.reasoning_summary_text.done", text="Je pars d'un circuit en série avec une DEL."),
+                    Event(type="response.output_text.delta", delta=lab[:40]),
+                    Event(type="response.output_text.delta", delta=lab[40:]),
+                    Event(type="response.completed", response=Event(output_text=lab)),
+                ])
+
+    monkeypatch.setenv("MODEL_API_KEY", "test-key")
+    monkeypatch.setattr(meta, "_client", lambda cfg, planner=False: Fake)
+    monkeypatch.setattr(generate, "check", lambda lab, node: [])
+    notes = []
+    out = generate.lab_from_lesson(settings(), "La loi d'Ohm. " * 30, note=lambda kind, **facts: notes.append((kind, facts)), teacher="French")
+    assert out["title"] == SAMPLE["title"]
+    assert seen["reasoning"] == {"effort": "medium", "summary": "auto"} and seen["stream"] is True
+    assert seen["text"]["format"]["type"] == "json_schema"  # text.format: the Responses API's structured output
+    assert any("French" in m["content"] for m in seen["input"] if m["role"] == "developer")
+    assert ("thinking", {"text": "Je pars d'un circuit en série avec une DEL."}) in notes
+
+
+def test_each_job_has_its_model(monkeypatch):
+    monkeypatch.setenv("DESIGN_MODEL", "muse-wonder-1.0")
+    monkeypatch.setenv("TUTOR_MODEL", "muse-spark-1.3-contributor")
+    cfg = settings()
+    assert (cfg.design_model, cfg.tutor_model, cfg.planner_model) == ("muse-wonder-1.0", "muse-spark-1.3-contributor", "muse-spark-1.3")
+
+
+def test_the_realtime_session_is_named_in_the_address():
+    url = voice.realtime_url(settings())
+    assert url.startswith("wss://api.meta.ai/v1/asr/realtime?sessionId=timalens-")

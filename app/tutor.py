@@ -63,7 +63,7 @@ def _request(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
     else:
         content = text
     messages.append({"role": "user", "content": content})
-    kwargs: dict[str, Any] = {"model": cfg.planner_model, "messages": messages}
+    kwargs: dict[str, Any] = {"model": cfg.tutor_model, "messages": messages}
     if not cfg.planner_is_open_weight:
         kwargs["reasoning_effort"] = "low"  # a tutor answers fast
     return kwargs
@@ -105,7 +105,7 @@ def while_making(cfg: Settings, lesson: str, draft: dict[str, Any] | None, stage
     if speak:
         messages.append({"role": "developer", "content": f"Answer in {speak}."})
     messages.append({"role": "user", "content": question})
-    kwargs: dict[str, Any] = {"model": cfg.planner_model, "messages": messages}
+    kwargs: dict[str, Any] = {"model": cfg.tutor_model, "messages": messages}
     if not cfg.planner_is_open_weight:
         kwargs["reasoning_effort"] = "low"
     reply = _client(cfg, planner=True).chat.completions.create(**kwargs)

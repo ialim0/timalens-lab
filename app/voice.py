@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import json
+import uuid
 from typing import Any
 
 import httpx
@@ -49,9 +50,14 @@ def handshake(cfg: Settings, language: str) -> dict[str, Any]:
     }
 
 
+def realtime_url(cfg: Settings) -> str:
+    """The realtime endpoint, with a session id of ours (Meta logs it and sends it back)."""
+    return f"{cfg.asr_realtime_url}?sessionId=timalens-{uuid.uuid4().hex[:16]}"
+
+
 async def connect(cfg: Settings) -> Any:
     """The realtime connection to Meta (a function of its own, so tests can stand in for it)."""
-    return await websockets.connect(cfg.asr_realtime_url, max_size=1 << 20, open_timeout=10, ping_interval=20)
+    return await websockets.connect(realtime_url(cfg), max_size=1 << 20, open_timeout=15, ping_interval=20)
 
 
 async def relay(browser: WebSocket, cfg: Settings, language: str) -> None:
@@ -92,7 +98,7 @@ async def relay(browser: WebSocket, cfg: Settings, language: str) -> None:
                     continue
                 event = json.loads(raw)
                 if event.get("type") in EVENTS:
-                    await browser.send_json({k: event[k] for k in ("type", "turnId", "transcript", "message") if k in event})
+                    await browser.send_json({k: event[k] for k in ("type", "turnId", "transcript", "final", "message") if k in event})
 
         tasks = [asyncio.create_task(upstream()), asyncio.create_task(downstream())]
         done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)

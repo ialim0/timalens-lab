@@ -106,9 +106,13 @@ def check(lab: dict[str, Any], node: str) -> list[str]:
         raise RuntimeError(f"the lab checker failed: {run.stderr[:300]}") from exc
 
 
+THINK_ALOUD = """The teacher hears the summaries of your reasoning read aloud while you work: write
+your reasoning in {language}, plainly, about the lab you are designing for their lesson."""
+
+
 def lab_from_lesson(cfg: Settings, text: str, *, language: str = "auto", level: str = "", view: str = "auto",
                     progress: Callable[[str, str], None] = lambda stage, detail="": None,
-                    note: Callable[..., None] = lambda kind, **facts: None) -> dict[str, Any]:
+                    note: Callable[..., None] = lambda kind, **facts: None, teacher: str = "") -> dict[str, Any]:
     """A checked lab for a lesson. Raises Unsupported for a lesson the lab cannot teach.
     view: "2d" or "3d" when the teacher chose; "auto" lets Muse Spark choose from the lesson.
     note(kind, **facts) reports each step as it happens (Tima tells the teacher about it)."""
@@ -117,11 +121,14 @@ def lab_from_lesson(cfg: Settings, text: str, *, language: str = "auto", level: 
     wishes = "; ".join(w for w in wishes if w)
     ask = f"The lesson{f' ({wishes})' if wishes else ''}:\n\n{text[:400_000]}"
     messages: list[dict[str, Any]] = [{"role": "developer", "content": FORMAT}, {"role": "user", "content": ask}]
+    if teacher in ("French", "English"):  # Tima reads Muse Spark's reasoning to the teacher, in their language
+        messages.insert(1, {"role": "developer", "content": THINK_ALOUD.format(language=teacher)})
     problems: list[str] = []
     for attempt in range(1, MAX_TRIES + 1):
         progress("designing", f"Muse Spark, attempt {attempt}")
         note("designing", attempt=attempt)
-        lab = chat_json(cfg, messages, schema=SCHEMA, name="circuits_lab")
+        lab = chat_json(cfg, messages, schema=SCHEMA, name="circuits_lab", model=cfg.design_model,
+                        on_thought=lambda thought: note("thinking", text=thought[:400]))
         if not isinstance(lab, dict):
             raise MetaError("the planner did not return a JSON object")
         if lab.get("lab") == "unsupported":

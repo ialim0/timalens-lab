@@ -29,6 +29,10 @@ class Settings:
     base_url: str = field(default_factory=lambda: _env("META_BASE_URL", "https://api.meta.ai/v1"))
     planner_model: str = field(default_factory=lambda: _env("PLANNER_MODEL", "muse-spark-1.3"))
     planner_effort: str = field(default_factory=lambda: _env("PLANNER_EFFORT", "medium"))
+    # which Meta model does which job: Muse Wonder (muse-wonder-1.0) may design the labs, and a
+    # Contributor-mode Muse Spark (muse-spark-1.3-contributor) may tutor, at a lower price
+    design_model: str = field(default_factory=lambda: _env("DESIGN_MODEL") or _env("PLANNER_MODEL", "muse-spark-1.3"))
+    tutor_model: str = field(default_factory=lambda: _env("TUTOR_MODEL") or _env("PLANNER_MODEL", "muse-spark-1.3"))
     asr_model: str = field(default_factory=lambda: _env("ASR_MODEL", "muse-voice-transcribe-1.0"))
     asr_realtime_url: str = field(default_factory=lambda: _env("ASR_REALTIME_URL", "wss://api.meta.ai/v1/asr/realtime"))
     # Tima's voice (Voxtral TTS); voices are picked per language, or set here

@@ -196,6 +196,7 @@ function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
     form.append("language", language);
     form.append("level", level);
     form.append("view", view);
+    form.append("ui", lang); // Muse Spark reasons in the teacher's language: Tima reads its thoughts aloud
     setLines([]);
     setProgress("reading");
     cancelled.current = false;
