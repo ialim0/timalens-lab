@@ -81,7 +81,7 @@ without a key, the browser's own voice speaks.
 
 ## Try it
 
-- **Live:** _the Cloud Run URL_ (the address opens a lab; teachers upload a lesson at `/teach`)
+- **Live:** https://timalens-lab-dapbuzyhfa-uc.a.run.app (opens a lab) · teachers: https://timalens-lab-dapbuzyhfa-uc.a.run.app/teach · a lab Muse Spark made from the sample lesson: https://timalens-lab-dapbuzyhfa-uc.a.run.app/lab?lab=9601d7cce2b3
 - **Sample labs, no key needed:** `/lab?lab=sample-lampes-en` (3D) · `/lab?lab=sample-ohm-en` (2D)
 - **Run it:** `cp .env.example .env` (add `MODEL_API_KEY`), then `make dev` and open http://localhost:3000
 - **Code:** https://github.com/ialim0/timalens-lab · **Demo script:** [docs/DEMO.md](docs/DEMO.md)
