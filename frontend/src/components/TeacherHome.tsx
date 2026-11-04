@@ -13,7 +13,7 @@ import { useUiLanguage, type UiLanguage } from "./useUiLanguage";
 
 type Strings = (typeof TEACHER)["fr"];
 type Stage = "reading" | "designing" | "checking" | "ready";
-type LabEntry = { id: string; title: string; origin: "sample" | "generated"; view: "2d" | "3d" };
+type LabEntry = { id: string; title: string; origin: "sample" | "generated"; view: "2d" | "3d"; cover?: string };
 type View = "auto" | "2d" | "3d";
 type JobEvent = { kind: string; [fact: string]: unknown };
 type Line = { who: "tima" | "you"; text: string };
@@ -102,7 +102,8 @@ function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
   const [lines, setLines] = useState<Line[]>([]);
   const [opening, setOpening] = useState<number | null>(null);
   const [ready, setReady] = useState<string | null>(null);
-  const [offline, setOffline] = useState(false); // the server cannot reach Meta: say so before the teacher waits
+  const [offline, setOffline] = useState(false);
+  const [cover, setCover] = useState<string | null>(null); // drawn by Muse Image while the lab is made // the server cannot reach Meta: say so before the teacher waits
   const job = useRef("");
   const chat = useRef<{ role: string; content: string }[]>([]);
   const root = useRef<HTMLDivElement>(null);
@@ -148,6 +149,7 @@ function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
       if (!r.ok) throw new Error(T.interrupted);
       const s = await r.json();
       for (const event of (s.events ?? []).slice(seen) as JobEvent[]) {
+        if (event.kind === "cover" && typeof event.url === "string") setCover(event.url);
         const say = (M as Record<string, unknown>)[event.kind];
         if (typeof say === "function" && !["failed", "unsupported"].includes(event.kind)) {
           const line = say(event) as string;
@@ -198,6 +200,7 @@ function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
     form.append("view", view);
     form.append("ui", lang); // Muse Spark reasons in the teacher's language: Tima reads its thoughts aloud
     setLines([]);
+    setCover(null);
     setProgress("reading");
     cancelled.current = false;
     try {
@@ -224,6 +227,7 @@ function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
     <section className={`maker ${working ? "working" : ""}`} aria-label="Create">
       {/* Tima lives here from the start, hidden until the lab is being made */}
       <div className="agent" hidden={!working}>
+        {cover && <img className="cover" src={cover} alt="" />}
         <div ref={root} />
         <div className="meter"><i style={{ width: `${PROGRESS[Math.max(0, STAGES.indexOf(progress ?? "reading"))]}%` }} /></div>
         <ol className="journal" aria-live="polite">
@@ -351,7 +355,8 @@ function Labs({ T, lang }: { T: Strings; lang: UiLanguage }) {
   return (
     <div className="labs">
       {labs.map((l) => (
-        <a key={l.id} href={labLink(l.id)}>
+        <a key={l.id} href={labLink(l.id)} className={l.cover ? "with-cover" : ""}>
+          {l.cover && <img src={l.cover} alt="" loading="lazy" />}
           <span>{l.title}</span>
           <span className="badges">
             {l.origin === "sample" ? <span className="pill">{T.sample}</span> : <span className="pill blue">{T.generated}</span>}

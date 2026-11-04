@@ -506,3 +506,51 @@ def test_each_job_has_its_model(monkeypatch):
 def test_the_realtime_session_is_named_in_the_address():
     url = voice.realtime_url(settings())
     assert url.startswith("wss://api.meta.ai/v1/asr/realtime?sessionId=timalens-")
+
+
+
+# ---------------------------------------------------------------- Muse Image draws the cover
+def test_muse_image_draws_the_cover_while_the_lab_is_made(monkeypatch):
+    lab = copy.deepcopy(SAMPLE)
+    monkeypatch.setattr(generate, "chat_json", lambda cfg, messages, **kw: lab)
+    prompts = []
+
+    def draw(cfg, prompt):
+        prompts.append(prompt)
+        return b"\x89PNG fake"
+
+    monkeypatch.setattr(server, "draw", draw)
+    client = TestClient(server.app)
+    job = client.post("/api/labs", data={"text": "La loi d'Ohm\n" + "Une résistance freine le courant. " * 20}).json()["job"]
+    for _ in range(200):
+        status = client.get(f"/api/jobs/{job}").json()
+        if status["stage"] == "ready" and any(e["kind"] == "cover" for e in status["events"]):
+            break
+        time.sleep(0.05)
+    assert SAMPLE["title"] in prompts[0] and "cover" not in status
+    assert client.get(f"/api/jobs/{job}/cover").content == b"\x89PNG fake"
+    for _ in range(100):  # the cover follows the lab
+        if client.get(f"/api/labs/{status['lab']}").json().get("cover"):
+            break
+        time.sleep(0.05)
+    made = client.get(f"/api/labs/{status['lab']}").json()
+    assert client.get(made["cover"]).content == b"\x89PNG fake"
+    assert any(entry.get("cover") for entry in client.get("/api/labs").json())
+
+
+def test_muse_image_returns_base64_or_a_url(monkeypatch):
+    import base64 as b64
+    from types import SimpleNamespace as NS
+
+    from app import meta
+
+    class Fake:
+        class images:
+            @staticmethod
+            def generate(**kw):
+                assert kw["model"] == "muse-image-1.0"
+                return NS(data=[NS(b64_json=b64.b64encode(b"png!").decode(), url=None)])
+
+    monkeypatch.setenv("MODEL_API_KEY", "test-key")
+    monkeypatch.setattr(meta, "_client", lambda cfg, planner=False: Fake)
+    assert meta.draw(settings(), "a circuit") == b"png!"

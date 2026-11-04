@@ -14,7 +14,7 @@
 ## 0:15 · The teacher uploads a lesson (30 s)
 
 1. Drop `lecon_loi_ohm.pdf` on the home page. Under **Options**, set *Niveau* to 4e, then click **Créer le laboratoire**.
-2. While the stages tick, say:
+2. Tima takes over: she reads the lesson, then **reads Muse Spark's reasoning aloud** as it designs the lab, while Muse Image draws its cover. Ask her a question out loud meanwhile ("Hey Tima, what does my lesson insist on?"). When the lab is checked, it **opens by itself**. While it works, say:
 
    > "Muse Spark reads the whole lesson: its notation, its examples, the mistakes it warns about. It writes the lab as structured JSON. Then our circuit engine lays out and solves every circuit. It searches the controls the student can touch to prove every challenge can be solved. Anything wrong goes back to Muse Spark in plain words. The AI configures the lab. It never computes the physics."
 

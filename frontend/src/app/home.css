@@ -90,3 +90,8 @@ footer a { color: inherit; }
 
 .notice { margin-top: 10px; padding: 10px 12px; border-radius: 12px; font-size: 13px; text-align: center;
   color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+
+.agent .cover { width: 100%; max-width: 480px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 18px; box-shadow: var(--shadow-lg); animation: cover-in .8s ease; }
+@keyframes cover-in { from { opacity: 0; transform: scale(.97); filter: blur(8px); } }
+.labs a.with-cover { padding-top: 0; overflow: hidden; }
+.labs a.with-cover img { width: calc(100% + 32px); margin: 0 -16px; aspect-ratio: 16 / 9; object-fit: cover; }

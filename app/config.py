@@ -34,6 +34,7 @@ class Settings:
     design_model: str = field(default_factory=lambda: _env("DESIGN_MODEL") or _env("PLANNER_MODEL", "muse-spark-1.3"))
     tutor_model: str = field(default_factory=lambda: _env("TUTOR_MODEL") or _env("PLANNER_MODEL", "muse-spark-1.3"))
     asr_model: str = field(default_factory=lambda: _env("ASR_MODEL", "muse-voice-transcribe-1.0"))
+    image_model: str = field(default_factory=lambda: _env("IMAGE_MODEL", "muse-image-1.0"))  # draws each lab's cover
     asr_realtime_url: str = field(default_factory=lambda: _env("ASR_REALTIME_URL", "wss://api.meta.ai/v1/asr/realtime"))
     # Tima's voice (Voxtral TTS); voices are picked per language, or set here
     tts_api_key: str = field(default_factory=lambda: _env("MISTRAL_API_KEY"))

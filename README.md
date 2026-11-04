@@ -9,7 +9,12 @@
 
 **From watching a lesson to experiencing it.** · [Lire en français](README.fr.md) · [Demo script](docs/DEMO.md)
 
-> Built for the Meta AI Global Hackathon.
+> Built for the Meta Global AI Developer Hackathon: see [SUBMISSION.md](SUBMISSION.md).
+
+| Tima tells the teacher what Muse Spark is doing, and thinking | Students build and experiment, Tima guides them by voice |
+|---|---|
+| ![Tima narrates the generation](docs/images/tima-at-work.png) | ![Tima points at the bulbs she is talking about](docs/images/tima-points.png) |
+| ![The teacher's page](docs/images/home.png) | ![The 3D bench](docs/images/lab-3d.png) |
 
 A teacher uploads a lesson on electric circuits: a PDF, a Word or PowerPoint file, a photo of the blackboard or a notebook page, or a recording of the class. A minute later they have an interactive lab to share with their students as a single link. In the lab, students:
 
@@ -107,6 +112,7 @@ The engine is tested against hand-worked answers. The same file runs in the stud
 | `muse-spark-1.3` | `app/generate.py` `translate_lab` | Translates a lab (French ⇄ English, or a lab's content into Wolof, Hausa, Yorùbá, Fɔngbè, Kiswahili, Bamanankan). The structure must come back identical (ids, values, goals, answer indexes) and the engine re-checks it, so a translation can never change the physics or move a quiz answer. |
 | `muse-voice-transcribe-1.0` (realtime) | `app/voice.py` `relay` | Tima's ears: streaming transcription with endpointing, and "Tima" as a keyword. |
 | `muse-voice-transcribe-1.0` | `app/meta.py` `transcribe` | Turns recorded lessons into text. |
+| `muse-image-1.0` | `app/meta.py` `draw` | Draws each lab's cover while the engine checks the lab. |
 
 **Open weights.** Set `PLANNER_BASE_URL` to point both the designer and the tutor at any OpenAI-compatible server, for example vLLM serving an open-weight Muse model. A school or ministry can then run the whole thing on its own hardware.
 

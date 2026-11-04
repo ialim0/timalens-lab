@@ -825,6 +825,7 @@ const missionCount = () => (state.lab.activities?.length ?? 0) + (state.lab.chal
 function showIntro() {
   const intro = $("#intro"), t = state.t;
   $("#intro-title").textContent = state.lab.title;
+  if (state.lab.cover) Object.assign($("#intro-cover"), { src: state.lab.cover, hidden: false }); // drawn by Muse Image
   $("#intro-sub").textContent = voice.missions(missionCount());
   $("#intro-start").textContent = t.intro_start;
   $("#intro-quiet").textContent = t.intro_quiet;

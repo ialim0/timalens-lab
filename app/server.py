@@ -12,6 +12,7 @@ import itertools
 import json
 import os
 import re
+import shutil
 import socket
 import subprocess
 import tempfile
@@ -34,7 +35,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from app import generate, lesson, tutor, voice
 from app.config import ROOT, settings
-from app.meta import UNREACHABLE, MetaError, read_pages, transcribe
+from app.meta import COVER, UNREACHABLE, MetaError, draw, read_pages, transcribe
 
 # the web app: a static Next.js export (frontend/), built by `make build` or the Dockerfile
 WEB = Path(os.environ.get("WEB_DIR", ROOT / "frontend" / "out"))
@@ -72,6 +73,10 @@ def sessions_dir() -> Path:
     return path
 
 
+def cover_path(lab_id: str) -> Path:
+    return labs_dir() / f"{lab_id}.png"
+
+
 def read_stored(lab_id: str) -> dict[str, Any]:
     if not SAFE_ID.match(lab_id) or not (labs_dir() / f"{lab_id}.json").exists():
         raise HTTPException(404, "no such lab")
@@ -89,6 +94,9 @@ def read_lab(lab_id: str) -> tuple[dict[str, Any], str]:
     stored = read_stored(lab_id)
     lab = stored["lab"]
     lab["translations"] = {**stored.get("translations", {}), (lab.get("language") or "")[:2]: lab_id}
+    source = stored.get("source") or lab_id  # a translation shares its lab's cover
+    if cover_path(source).exists():
+        lab["cover"] = f"/api/labs/{source}/cover"
     return lab, stored.get("lesson", "")
 
 
@@ -145,7 +153,10 @@ def list_labs(lang: str = "") -> list[dict[str, Any]]:
             continue
         lab_id = stored.get("translations", {}).get(lang, path.stem) if lang else path.stem
         title = stored["lab"]["title"] if lab_id == path.stem else read_stored(lab_id)["lab"]["title"]
-        out.append({"id": lab_id, "title": title, "origin": "generated", "view": stored["lab"].get("view", "2d")})
+        entry = {"id": lab_id, "title": title, "origin": "generated", "view": stored["lab"].get("view", "2d")}
+        if cover_path(path.stem).exists():
+            entry["cover"] = f"/api/labs/{path.stem}/cover"
+        out.append(entry)
     return out
 
 
@@ -209,6 +220,9 @@ def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, la
         job["events"].append({"kind": kind, **facts})
         if kind == "designed":
             job["draft"] = {k: facts.get(k) for k in ("title", "objectives")}
+            if "cover" not in job:  # Muse Image draws the cover while the engine checks the lab
+                job["cover"] = None
+                threading.Thread(target=_draw_cover, args=(job_id, facts), daemon=True).start()
 
     try:
         def progress(stage: str, detail: str = "") -> None:
@@ -241,6 +255,7 @@ def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, la
                                        teacher=tutor.LANGUAGES.get(ui[:2], ""))
         (labs_dir() / f"{key}.json").write_text(json.dumps({"lab": lab, "lesson": text[:200_000]}, ensure_ascii=False))
         job.update(stage="ready", lab=key)
+        _keep_cover(job)
         note("ready", lab=key, title=lab.get("title", ""))
     except generate.Unsupported as exc:
         job.update(stage="unsupported", detail=str(exc))
@@ -270,7 +285,44 @@ async def create_lab(file: UploadFile | None = File(None), text: str = Form(""),
     return {"job": job_id}
 
 
-PRIVATE_JOB_KEYS = {"lesson", "draft"}  # for Tima's answers, not sent on every poll
+PRIVATE_JOB_KEYS = {"lesson", "draft", "cover"}  # for Tima's answers and the cover, not sent on every poll
+
+
+def _draw_cover(job_id: str, facts: dict[str, Any]) -> None:
+    """Muse Image's cover for a lab being made. A failure only means no cover."""
+    job = jobs[job_id]
+    about = "; ".join(map(str, facts.get("objectives") or []))[:400]
+    try:
+        image = draw(settings(), COVER.format(title=facts.get("title", ""), about=about))
+    except Exception:  # noqa: BLE001 - the lab is the point, the cover a bonus
+        return
+    path = settings().data_dir / "covers" / f"{job_id}.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(image)
+    job["cover"] = str(path)
+    job["events"].append({"kind": "cover", "url": f"/api/jobs/{job_id}/cover"})
+    _keep_cover(job)
+
+
+def _keep_cover(job: dict[str, Any]) -> None:
+    """Once the lab exists and its cover is drawn (in either order), the cover goes with the lab."""
+    if job.get("lab") and job.get("cover") and Path(job["cover"]).exists():
+        shutil.copyfile(job["cover"], cover_path(job["lab"]))
+
+
+@app.get("/api/jobs/{job_id}/cover")
+def job_cover(job_id: str) -> FileResponse:
+    path = jobs.get(job_id, {}).get("cover")
+    if not path or not Path(path).exists():
+        raise HTTPException(404, "no cover yet")
+    return FileResponse(path, media_type="image/png")
+
+
+@app.get("/api/labs/{lab_id}/cover")
+def lab_cover(lab_id: str) -> FileResponse:
+    if not SAFE_ID.match(lab_id) or not cover_path(lab_id).exists():
+        raise HTTPException(404, "no cover")
+    return FileResponse(cover_path(lab_id), media_type="image/png", headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/api/jobs/{job_id}")

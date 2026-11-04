@@ -115,6 +115,25 @@ def _thinking_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dic
         raise MetaError(f"the planner's reply was not JSON: {content[:300]}") from exc
 
 
+# ---------------------------------------------------------------- Muse Image
+COVER = """A warm, bright illustration for a school physics lab: "{title}". {about}
+A real electric circuit on a wooden classroom desk in West Africa: a battery, wires, glowing bulbs,
+a resistor with its colour bands, a multimeter. Soft daylight, hopeful, hand-painted look. No text."""
+
+
+def draw(cfg: Settings, prompt: str) -> bytes:
+    """An image from Muse Image (the Images API: base64 or a signed URL back)."""
+    if not cfg.api_key:
+        raise MetaError("MODEL_API_KEY is not set")
+    reply = _client(cfg).images.generate(model=cfg.image_model, prompt=prompt)
+    item = reply.data[0] if reply.data else None
+    if item is not None and getattr(item, "b64_json", None):
+        return base64.b64decode(item.b64_json)
+    if item is not None and getattr(item, "url", None):
+        return httpx.get(item.url, timeout=60).content
+    raise MetaError("Muse Image sent no image")
+
+
 # ---------------------------------------------------------------- Muse Spark: reading pages
 READ_PAGES = """\
 These are photos or scans of a teacher's lesson: a textbook or notebook page, a blackboard,

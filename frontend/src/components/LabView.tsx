@@ -53,6 +53,7 @@ export default function LabView() {
       <dialog id="finish-dialog" className="sheet" />
 
       <div className="intro" id="intro" hidden>
+        <img className="intro-cover" id="intro-cover" alt="" hidden />
         <div className="intro-card">
           <div className="intro-orb" aria-hidden="true"><span className="tima-ring" /><span className="tima-core" /></div>
           <h1 id="intro-title" />
