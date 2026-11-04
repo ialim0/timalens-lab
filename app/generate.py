@@ -10,6 +10,7 @@ three times. The model configures the lab; it never computes the physics.
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from collections.abc import Callable
 from typing import Any
@@ -18,6 +19,7 @@ from app.config import ROOT, Settings
 from app.meta import MetaError, chat_json
 
 MAX_TRIES = 3
+log = logging.getLogger("timalens.generate")
 
 
 class Unsupported(ValueError):
@@ -139,6 +141,8 @@ def lab_from_lesson(cfg: Settings, text: str, *, language: str = "auto", level: 
         note("checking")
         problems = check(lab, cfg.node)
         note("problems" if problems else "checked", count=len(problems))
+        if problems:
+            log.warning("attempt %d: %d problems (%s); the lab's keys: %s", attempt, len(problems), "; ".join(problems[:4]), sorted(lab)[:20])
         if not problems:
             lab.setdefault("version", 1)
             if view in ("2d", "3d"):

@@ -554,3 +554,23 @@ def test_muse_image_returns_base64_or_a_url(monkeypatch):
     monkeypatch.setenv("MODEL_API_KEY", "test-key")
     monkeypatch.setattr(meta, "_client", lambda cfg, planner=False: Fake)
     assert meta.draw(settings(), "a circuit") == b"png!"
+
+
+
+def test_an_answer_cut_short_is_said_plainly(monkeypatch):
+    from types import SimpleNamespace as Event
+
+    from app import meta
+
+    class Fake:
+        class responses:
+            @staticmethod
+            def create(**kw):
+                assert kw["max_output_tokens"] >= 32_000  # room for the reasoning and the whole lab
+                return iter([Event(type="response.output_text.delta", delta='{"title": "Oh'),
+                             Event(type="response.incomplete", response=Event(incomplete_details=Event(reason="max_output_tokens")))])
+
+    monkeypatch.setenv("MODEL_API_KEY", "test-key")
+    monkeypatch.setattr(meta, "_client", lambda cfg, planner=False: Fake)
+    with pytest.raises(meta.MetaError, match="cut short .max_output_tokens."):
+        meta.chat_json(settings(), [{"role": "user", "content": "?"}], schema={"type": "object"}, on_thought=lambda t: None)

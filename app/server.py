@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
+import logging
 import os
 import re
 import shutil
@@ -47,6 +48,7 @@ SAFE_ID = re.compile(r"^[a-z0-9-]{3,64}$")
 BENCH_PICTURE = re.compile(r"^data:image/(?:jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
 MAX_PICTURE = 3_000_000  # characters of base64: a screenshot of the bench, not a photo album
 
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 app = FastAPI(title="TimaLens Lab")
 app.add_middleware(GZipMiddleware, minimum_size=1024)  # phones on 2G; Tima's streamed answers are left as they are
 

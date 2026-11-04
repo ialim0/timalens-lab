@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 import re
 from collections.abc import Callable
 from pathlib import Path
@@ -29,6 +30,9 @@ from app.config import Settings
 class MetaError(RuntimeError):
     """A Meta model could not do what was asked; the message says why."""
 
+
+OUTPUT_TOKENS = 64_000  # a lab is a long JSON, and the reasoning before it counts too
+log = logging.getLogger("timalens.meta")
 
 UNREACHABLE = "Meta's API cannot be reached from this network (the connection times out): try another network, or the deployed app."
 # a model may think for minutes, but a connection that does not open in seconds will not open
@@ -77,6 +81,7 @@ def chat_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dict[str
         kwargs["response_format"] = {"type": "json_schema", "json_schema": {"name": name, "schema": schema, "strict": False}}
     if not cfg.planner_is_open_weight:
         kwargs["reasoning_effort"] = effort or cfg.planner_effort
+        kwargs["max_tokens"] = OUTPUT_TOKENS
     reply = client.chat.completions.create(**kwargs)
     content = reply.choices[0].message.content or ""
     try:
@@ -93,7 +98,8 @@ def _thinking_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dic
     and summaries arrive as response.reasoning_summary_text.done events. A summary is not
     guaranteed for every response: without one, nothing is said.
     """
-    kwargs: dict[str, Any] = {"model": model or cfg.planner_model, "input": messages,
+    # reasoning tokens count against the output limit: leave room for the thinking and the whole lab
+    kwargs: dict[str, Any] = {"model": model or cfg.planner_model, "input": messages, "max_output_tokens": OUTPUT_TOKENS,
                               "reasoning": {"effort": effort or cfg.planner_effort, "summary": "auto"}, "stream": True}
     if schema is not None:
         kwargs["text"] = {"format": {"type": "json_schema", "name": name, "schema": schema, "strict": False}}
@@ -106,9 +112,13 @@ def _thinking_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dic
             written.append(event.delta)
         elif kind == "response.completed":
             final = getattr(event.response, "output_text", "") or ""
+        elif kind == "response.incomplete":  # cut short (usually the output limit): the JSON is not whole
+            reason = getattr(getattr(event.response, "incomplete_details", None), "reason", "") or "unknown"
+            raise MetaError(f"Muse Spark's answer was cut short ({reason})")
         elif kind in ("response.failed", "error"):
             raise MetaError(f"Muse Spark stopped: {getattr(event, 'message', None) or kind}")
     content = "".join(written) or final
+    log.info("Muse Spark answered %d characters: %s", len(content), content[:300].replace("\n", " "))
     try:
         return _json_from(content)
     except (json.JSONDecodeError, MetaError) as exc:

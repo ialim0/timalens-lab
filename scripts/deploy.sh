@@ -24,6 +24,13 @@ echo "==> 1/3 Registry and APIs"
 
 REPO="$("${TF[@]}" output -raw image_repository)"
 
+# On a new project, Cloud Build runs as the default compute service account, which cannot build yet
+NUMBER="$(gcloud projects describe "$PROJECT" --format='value(projectNumber)')"
+for role in roles/cloudbuild.builds.builder roles/artifactregistry.writer roles/storage.objectViewer roles/logging.logWriter; do
+  gcloud projects add-iam-policy-binding "$PROJECT" --member="serviceAccount:$NUMBER-compute@developer.gserviceaccount.com" \
+    --role="$role" --condition=None --quiet --format=none
+done
+
 echo "==> 2/3 Build $REPO:$TAG with Cloud Build"
 gcloud builds submit "$ROOT" --project "$PROJECT" --region "$REGION" --tag "$REPO:$TAG"
 

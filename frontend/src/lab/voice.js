@@ -73,7 +73,7 @@ export class LiveEars {
       else if (event.type === "transcript" && !event.final) this.on.partial?.(event.transcript ?? "");
       else if (event.type === "speechComplete" || (event.type === "transcript" && event.final)) {
         // a turn may end both ways (a final transcript, then speechComplete): count it once
-        if (event.turnId && event.turnId === this.lastTurn) return;
+        if (event.turnId != null && event.turnId === this.lastTurn) return; // Meta numbers turns from 0
         this.lastTurn = event.turnId;
         this.on.final?.(event.transcript ?? "");
       }
