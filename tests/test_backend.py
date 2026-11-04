@@ -574,3 +574,21 @@ def test_an_answer_cut_short_is_said_plainly(monkeypatch):
     monkeypatch.setattr(meta, "_client", lambda cfg, planner=False: Fake)
     with pytest.raises(meta.MetaError, match="cut short .max_output_tokens."):
         meta.chat_json(settings(), [{"role": "user", "content": "?"}], schema={"type": "object"}, on_thought=lambda t: None)
+
+
+
+def test_a_lab_cut_short_is_designed_again_with_less_reasoning(monkeypatch):
+    from app import meta
+
+    efforts = []
+
+    def design(cfg, messages, **kw):
+        efforts.append(kw.get("effort"))
+        if len(efforts) == 1:
+            raise meta.CutShort("Muse Spark's answer was cut short (max_output_tokens)")
+        return copy.deepcopy(SAMPLE)
+
+    monkeypatch.setattr(generate, "chat_json", design)
+    monkeypatch.setattr(generate, "check", lambda lab, node: [])
+    assert generate.lab_from_lesson(settings(), "La loi d'Ohm. " * 30)["title"] == SAMPLE["title"]
+    assert efforts == [None, "low"]

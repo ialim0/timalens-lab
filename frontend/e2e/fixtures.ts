@@ -27,9 +27,10 @@ export const said = (page: Page): Promise<string[]> => page.evaluate(() => (wind
 export const hear = (page: Page, text: string, isFinal: boolean) => page.evaluate(([t, f]) => (window as any).__hear(t, f), [text, isFinal] as const);
 
 /** Open a lab and get past the intro, with Tima's voice on (or not). */
-export async function openLab(page: Page, query: string, { voice = false, tour = false, hands = false } = {}) {
+export async function openLab(page: Page, query: string, { voice = false, tour = false, hands = false, record = false } = {}) {
   if (!tour) await page.addInitScript(() => { try { localStorage.setItem("timalens-tour-done", "1"); } catch { /* no storage */ } });
   if (!hands) await page.addInitScript(() => { try { localStorage.setItem("timalens-hands", "off"); } catch { /* no storage */ } });
+  if (!record) await page.addInitScript(() => { try { localStorage.setItem("timalens-record", "off"); } catch { /* no storage */ } });
   await page.goto(`/lab?${query}`);
   await expect(page.locator("#intro")).toBeVisible();
   await page.locator(voice ? "#intro-start" : "#intro-quiet").click();

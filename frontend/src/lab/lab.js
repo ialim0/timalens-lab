@@ -10,6 +10,7 @@ import { TYPES, format, layout, meets, normalise, solve } from "./circuit.js";
 import { CELL, PAD, boardSvg, chargeAt, chargePaths, nearestEdge, px, standaloneSvg, symbol, view as boardView } from "./board.js";
 import { mountLanguageSwitch, strings, uiLanguage } from "./i18n.js";
 import { Session } from "./session.js";
+import { SessionRecorder } from "./recorder.js";
 import { Tima, lines } from "./tima.js";
 
 const E12 = [1, 1.2, 1.5, 1.8, 2.2, 2.7, 3.3, 3.9, 4.7, 5.6, 6.8, 8.2];
@@ -67,6 +68,7 @@ async function loadLab() {
   $("#finish").textContent = state.t.finish;
   $("#hands").title = $("#hands").ariaLabel = state.t.hands;
   $("#tour").title = $("#tour").ariaLabel = state.t.tour;
+  $("#rec").title = state.t.rec_title;
   fillDock();
   state.session = new Session(state.labId, lab);
   buildToolbar();
@@ -841,6 +843,7 @@ function showIntro() {
     setTimeout(() => { intro.hidden = true; }, 650);
     tima.start({ quiet });
     bench3d?.flyIn();
+    if (recordingWanted()) await startRecording(); // first, while the tap still counts: the browser asks which tab to film
     // hands and voice drive the lab: one permission prompt for both, before it begins
     const camera = handsWanted();
     try { (await navigator.mediaDevices.getUserMedia({ video: camera, audio: !quiet })).getTracks().forEach((track) => track.stop()); } catch { /* refused: mouse and keyboard still work */ }
@@ -913,6 +916,40 @@ function pick3d(id, point) {
   recompute();
 }
 $("#view-switch").addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
+// ---------------------------------------------------------------- the session's video, filmed as it happens
+// The lab's tab, the student's face and every sound, recorded in the browser from the first tap
+// (if the student lets the browser share this tab); Finish hands the video over to download.
+let recorder = null, recorded = null, downloaded = false;
+const REC_KEY = "timalens-record";
+const recordingWanted = () => { try { return localStorage.getItem(REC_KEY) !== "off"; } catch { return true; } };
+const clock = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+async function startRecording() {
+  const session = new SessionRecorder({ camera: () => hands?.stream ?? null });
+  try {
+    await session.start();
+  } catch (error) {
+    console.warn("no recording", error); // sharing refused: the lab goes on, Finish still makes a video from the log
+    return;
+  }
+  recorder = window.timalensRecorder = session;
+  session.onEnded = () => stopRecording(); // the student stopped sharing in the browser's bar
+  const pill = $("#rec");
+  pill.hidden = false;
+  const tick = setInterval(() => { if (recorder === session) $("#rec-time").textContent = clock(session.seconds); else clearInterval(tick); }, 1000);
+}
+async function stopRecording() {
+  if (!recorder) return recorded;
+  const session = recorder;
+  recorder = null;
+  $("#rec").hidden = true;
+  recorded = await session.stop();
+  return recorded;
+}
+$("#rec").addEventListener("click", () => openFinish());
+addEventListener("beforeunload", (e) => { // the video lives only in this page until it is downloaded
+  if (recorder || (recorded && !downloaded)) { e.preventDefault(); e.returnValue = ""; }
+});
+
 // ---------------------------------------------------------------- the guided tour
 const TOUR_KEY = "timalens-tour-done";
 const toured = () => { try { return localStorage.getItem(TOUR_KEY) === "1"; } catch { return true; } };
@@ -998,8 +1035,10 @@ $("#finish").addEventListener("click", openFinish);
 function openFinish() {
   const t = state.t, dialog = $("#finish-dialog");
   const s = state.session.summary(state.lab);
+  const filmed = Boolean(recorder || recorded);
   dialog.innerHTML = `<div class="in">
     <h2>${t.finish_title}</h2>
+    ${filmed ? `<div class="filmed" id="filmed"><div class="muted">${t.rec_stopping}</div></div>` : ""}
     <div class="tiles">
       <div><b>${s.challenges.solved} / ${s.challenges.total}</b><span>${t.challenges}</span></div>
       <div><b>${s.predictions.right} / ${s.predictions.total}</b><span>${t.predictions_label}</span></div>
@@ -1024,6 +1063,16 @@ function openFinish() {
   dialog.querySelector("#save").onclick = saveSession;
   dialog.querySelector("#download-log").onclick = () => download(new Blob([JSON.stringify(state.session.finish(state.lab))], { type: "application/json" }), `timalens-lab-${slug()}.json`);
   dialog.showModal();
+  if (filmed) stopRecording().then((video) => { // the session as it was lived, ready to download
+    const box = dialog.querySelector("#filmed");
+    if (!box || !video) return;
+    const url = URL.createObjectURL(video.blob);
+    const name = `timalens-lab-${slug()}-${new Date().toISOString().slice(0, 10)}.${video.extension}`;
+    box.innerHTML = `<b>${esc(t.rec_video)}</b> <span class="muted">${clock(video.seconds)}</span>
+      <video src="${url}" controls playsinline></video>
+      <div class="row"><a class="btn primary" id="rec-download" href="${url}" download="${name}">⬇ ${esc(t.rec_download)}</a><span class="muted">${esc(t.rec_note)}</span></div>`;
+    box.querySelector("#rec-download").addEventListener("click", () => { downloaded = true; });
+  });
 }
 const slug = () => (state.lab.title ?? "lab").toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
 function download(blob, name) {

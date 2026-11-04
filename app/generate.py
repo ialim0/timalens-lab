@@ -16,7 +16,7 @@ from collections.abc import Callable
 from typing import Any
 
 from app.config import ROOT, Settings
-from app.meta import MetaError, chat_json
+from app.meta import CutShort, MetaError, chat_json
 
 MAX_TRIES = 3
 log = logging.getLogger("timalens.generate")
@@ -126,11 +126,18 @@ def lab_from_lesson(cfg: Settings, text: str, *, language: str = "auto", level: 
     if teacher in ("French", "English"):  # Tima reads Muse Spark's reasoning to the teacher, in their language
         messages.insert(1, {"role": "developer", "content": THINK_ALOUD.format(language=teacher)})
     problems: list[str] = []
+    effort = None  # the configured effort; less if an answer is cut short
     for attempt in range(1, MAX_TRIES + 1):
         progress("designing", f"Muse Spark, attempt {attempt}")
         note("designing", attempt=attempt)
-        lab = chat_json(cfg, messages, schema=SCHEMA, name="circuits_lab", model=cfg.design_model,
-                        on_thought=lambda thought: note("thinking", text=thought[:400]))
+        try:
+            lab = chat_json(cfg, messages, schema=SCHEMA, name="circuits_lab", model=cfg.design_model, effort=effort,
+                            on_thought=lambda thought: note("thinking", text=thought[:400]))
+        except CutShort:
+            # the reasoning used the room the lab needed: think less, write the whole lab
+            effort = "minimal" if effort == "low" else "low"
+            problems = ["the answer was cut short"]
+            continue
         if not isinstance(lab, dict):
             raise MetaError("the planner did not return a JSON object")
         if lab.get("lab") == "unsupported":

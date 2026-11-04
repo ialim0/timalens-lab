@@ -328,3 +328,12 @@ body.hands-on .dock { padding-right: 270px; } /* room for the camera view in the
 @media (prefers-reduced-motion: reduce) { .tour-spot, .tour-card { transition: none; } }
 
 .intro-note { margin: 10px 0 0; max-width: 360px; font-size: 13px; color: rgba(255, 255, 255, .6); line-height: 1.4; }
+
+/* ---------------------------------------------------------------- the session being filmed */
+.rec { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 99px; padding: 5px 11px; font-size: 13px; font-weight: 700;
+  font-variant-numeric: tabular-nums; background: color-mix(in srgb, #ff3b30 12%, transparent); color: #ff3b30; }
+.rec i { width: 9px; height: 9px; border-radius: 50%; background: #ff3b30; animation: rec-blink 1.4s ease-in-out infinite; }
+@keyframes rec-blink { 50% { opacity: .25; } }
+.filmed { display: grid; gap: 8px; padding: 12px; border-radius: 14px; background: var(--ground); }
+.filmed video { width: 100%; border-radius: 10px; background: #000; }
+@media (prefers-reduced-motion: reduce) { .rec i { animation: none; } }

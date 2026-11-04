@@ -33,6 +33,10 @@ as one link (or on WhatsApp), that works on a $50 phone.
   under the finger lights up, and holding still clicks it), pinch to grab a part and drop it on the
   bench, open the hand to turn the 3D bench, make a fist to talk to Tima.
   Hands and voice together: no mouse, no keyboard.
+- **Every session is filmed, automatically.** With the student's consent (the browser asks to share
+  the tab at the first tap), the lab records itself: the screen, the student's face in a round inset,
+  Tima's voice and the student's. At Finish, the video downloads as an MP4, ready for WhatsApp.
+  It is filmed in the browser: nothing leaves the computer.
 - **Tima guides each student by voice**: she explains the missions, reacts to what the circuit
   does, wakes on "Hey Tima", **looks at the student's bench** before answering, and lights up
   the parts she is talking about.

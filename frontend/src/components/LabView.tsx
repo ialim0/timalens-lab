@@ -18,6 +18,7 @@ export default function LabView() {
         <div className="lesson-title" id="lab-title">…</div>
         <div className="origin" id="lab-origin" />
         <div id="lang-switch" />
+        <button type="button" className="rec" id="rec" hidden><i aria-hidden="true" /><span id="rec-time">0:00</span></button>
         <button type="button" className="btn help" id="tour" aria-label="?">?</button>
         <button type="button" className="btn hands" id="hands" aria-pressed="false" title="Hands">✋</button>
         <button type="button" className="btn vr" id="vr" hidden>VR</button>

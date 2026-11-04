@@ -31,6 +31,10 @@ class MetaError(RuntimeError):
     """A Meta model could not do what was asked; the message says why."""
 
 
+class CutShort(MetaError):
+    """The answer stopped at the output limit: asking again with less reasoning leaves it room."""
+
+
 OUTPUT_TOKENS = 64_000  # a lab is a long JSON, and the reasoning before it counts too
 log = logging.getLogger("timalens.meta")
 
@@ -114,7 +118,11 @@ def _thinking_json(cfg: Settings, messages: list[dict[str, Any]], *, schema: dic
             final = getattr(event.response, "output_text", "") or ""
         elif kind == "response.incomplete":  # cut short (usually the output limit): the JSON is not whole
             reason = getattr(getattr(event.response, "incomplete_details", None), "reason", "") or "unknown"
-            raise MetaError(f"Muse Spark's answer was cut short ({reason})")
+            usage = getattr(event.response, "usage", None)
+            thought = getattr(getattr(usage, "output_tokens_details", None), "reasoning_tokens", "?")
+            log.warning("cut short (%s) at effort %s: %s output tokens, %s of them reasoning, %d characters written",
+                        reason, kwargs["reasoning"]["effort"], getattr(usage, "output_tokens", "?"), thought, len("".join(written)))
+            raise CutShort(f"Muse Spark's answer was cut short ({reason})")
         elif kind in ("response.failed", "error"):
             raise MetaError(f"Muse Spark stopped: {getattr(event, 'message', None) or kind}")
     content = "".join(written) or final
