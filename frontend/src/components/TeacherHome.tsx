@@ -1,9 +1,12 @@
 "use client";
 
-// The teacher's page: drop a lesson, get a lab. Generation runs on the server as a job; this
-// page follows it, then hands the teacher one link to share.
-import { useCallback, useEffect, useState, type DragEvent, type FormEvent } from "react";
-import { TEACHER } from "@/lab/i18n.js";
+// The teacher's page: drop a lesson, get a lab. Generation runs on the server as a job, in the
+// background. Meanwhile Tima, the voice guide, tells the teacher what is happening (from the job's
+// real events) and answers their questions about the lesson; when the lab is ready, it opens.
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { MAKING, TEACHER, strings } from "@/lab/i18n.js";
+import { Tima } from "@/lab/tima.js";
 import { Brand } from "./Brand";
 import { LanguageSwitch } from "./LanguageSwitch";
 import { useUiLanguage, type UiLanguage } from "./useUiLanguage";
@@ -12,9 +15,13 @@ type Strings = (typeof TEACHER)["fr"];
 type Stage = "reading" | "designing" | "checking" | "ready";
 type LabEntry = { id: string; title: string; origin: "sample" | "generated"; view: "2d" | "3d" };
 type View = "auto" | "2d" | "3d";
+type JobEvent = { kind: string; [fact: string]: unknown };
+type Line = { who: "tima" | "you"; text: string };
 
 const STAGES: Stage[] = ["reading", "designing", "checking", "ready"];
 const PROGRESS = [12, 45, 80, 100];
+const IDLE_MS = 14_000; // Muse Spark quiet that long: Tima says what it is busy with
+const OPEN_IN = 3;
 const ACCEPT = ".pdf,.docx,.pptx,.txt,.md,.jpg,.jpeg,.png,.webp,.mp3,.wav,.m4a,.ogg,.webm,.mp4,.mov";
 const OTHER_LANGUAGES = [["Wolof", "Wolof"], ["Hausa", "Hausa"], ["Yoruba", "Yorùbá"], ["Fon", "Fɔngbè"], ["Swahili", "Kiswahili"], ["Bambara", "Bamanankan"]];
 
@@ -50,7 +57,7 @@ function Home({ lang }: { lang: UiLanguage }) {
           <h1 dangerouslySetInnerHTML={{ __html: T.hero }} />
           <p>{T.hero_text}</p>
         </section>
-        <Maker T={T} />
+        <Maker T={T} lang={lang} />
         <HowItWorks T={T} />
         <h2 className="section-title">{T.labs}</h2>
         <Labs T={T} lang={lang} />
@@ -61,7 +68,28 @@ function Home({ lang }: { lang: UiLanguage }) {
 }
 
 // ---------------------------------------------------------------- making a lab
-function Maker({ T }: { T: Strings }) {
+/** Tima, ready before the teacher's tap (browsers only let her speak during one). */
+function useTima(root: React.RefObject<HTMLDivElement | null>, lang: UiLanguage, onAsk: (question: string) => void) {
+  const tima = useRef<InstanceType<typeof Tima> | null>(null);
+  const ask = useRef(onAsk);
+  ask.current = onAsk;
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/health").then((r) => r.json()).catch(() => ({})).then((health) => {
+      if (!alive || !root.current) return;
+      tima.current = new Tima(root.current, {
+        lang, t: strings(lang), onAsk: (q: string) => ask.current(q),
+        live: { ears: health.live_ears, voice: health.voice },
+      });
+    });
+    return () => { alive = false; tima.current?.hush(); tima.current?.toggleWake(false); };
+  }, [root, lang]);
+  return tima;
+}
+
+function Maker({ T, lang }: { T: Strings; lang: UiLanguage }) {
+  const M = MAKING[lang];
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState("");
   const [language, setLanguage] = useState("auto");
@@ -70,8 +98,40 @@ function Maker({ T }: { T: Strings }) {
   const [open, setOpen] = useState({ paste: false, options: false });
   const [over, setOver] = useState(false);
   const [error, setError] = useState("");
-  const [progress, setProgress] = useState<{ stage: Stage; detail: string } | null>(null);
+  const [progress, setProgress] = useState<Stage | null>(null);
+  const [lines, setLines] = useState<Line[]>([]);
+  const [opening, setOpening] = useState<number | null>(null);
   const [ready, setReady] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false); // the server cannot reach Meta: say so before the teacher waits
+  const job = useRef("");
+  const chat = useRef<{ role: string; content: string }[]>([]);
+  const root = useRef<HTMLDivElement>(null);
+
+  const note = (line: Line) => setLines((all) => [...all.slice(-5), line]);
+
+  // the teacher asks while the lab is made: Tima answers from the lesson, out loud
+  const askTima = useCallback(async (question: string) => {
+    note({ who: "you", text: question });
+    tima.current?.think(true);
+    let answer: string;
+    try {
+      const r = await fetch(`/api/jobs/${job.current}/ask`, { method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ question, history: chat.current.slice(-8), language: lang }) });
+      if (!r.ok) throw new Error(String(r.status));
+      answer = (await r.json()).answer;
+    } catch {
+      answer = M.idle[0];
+    }
+    tima.current?.think(false);
+    chat.current.push({ role: "user", content: question }, { role: "assistant", content: answer });
+    note({ who: "tima", text: answer });
+    tima.current?.say(answer, { interrupt: true, followUp: true });
+  }, [lang, M]); // `tima` and `note` never change
+  const tima = useTima(root, lang, askTima);
+  useEffect(() => {
+    fetch("/api/health").then((r) => r.json()).then((h) => setOffline(h.meta_key && h.meta_reachable === false)).catch(() => {});
+  }, []);
+  const cancelled = useRef(false); // the teacher chose to stay on this page
 
   const drop = (e: DragEvent) => {
     e.preventDefault();
@@ -79,18 +139,46 @@ function Maker({ T }: { T: Strings }) {
     if (e.dataTransfer.files[0]) setFile(e.dataTransfer.files[0]);
   };
 
-  const follow = useCallback(async (job: string) => {
+  /** Follow the job: each new event becomes something Tima says; silence gets a word too. */
+  const follow = useCallback(async (id: string) => {
+    let seen = 0, quietSince = Date.now(), idle = 0;
     for (;;) {
       await wait(1200);
-      const r = await fetch(`/api/jobs/${job}`);
+      const r = await fetch(`/api/jobs/${id}`);
       if (!r.ok) throw new Error(T.interrupted);
       const s = await r.json();
+      for (const event of (s.events ?? []).slice(seen) as JobEvent[]) {
+        const say = (M as Record<string, unknown>)[event.kind];
+        if (typeof say === "function" && !["failed", "unsupported"].includes(event.kind)) {
+          const line = say(event) as string;
+          note({ who: "tima", text: line });
+          tima.current?.say(line);
+        }
+        quietSince = Date.now();
+      }
+      seen = s.events?.length ?? seen;
       if (s.stage === "unsupported") throw new Error(`${T.unsupported} ${s.detail}`);
       if (s.stage === "failed") throw new Error(`${T.failed} ${s.detail}`);
-      setProgress({ stage: s.stage, detail: s.stage === "ready" ? "" : s.detail ?? "" });
+      if (STAGES.includes(s.stage)) setProgress(s.stage);
       if (s.stage === "ready") return s.lab as string;
+      if (Date.now() - quietSince > IDLE_MS && idle < M.idle.length && !tima.current?.awake) {
+        tima.current?.say(M.idle[idle]);
+        note({ who: "tima", text: M.idle[idle++] });
+        quietSince = Date.now();
+      }
     }
-  }, [T]);
+  }, [T, M, tima]);
+
+  /** Once Tima has finished speaking, count down and open the lab (with her voice still allowed). */
+  const openWhenQuiet = useCallback(async (id: string) => {
+    while (tima.current?.speaking || tima.current?.awake) await wait(300);
+    for (let n = OPEN_IN; n > 0; n--) {
+      setOpening(n);
+      await wait(1000);
+      if (cancelled.current) return;
+    }
+    router.push(`${labLink(id)}&fresh=1`); // same page session: the lab may speak without another tap
+  }, [router, tima]);
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -100,94 +188,117 @@ function Maker({ T }: { T: Strings }) {
       setOpen((o) => ({ ...o, paste: true }));
       return;
     }
+    tima.current?.start(); // during the tap: from now on she may speak
+    tima.current?.toggleWake(true);
     const form = new FormData();
     if (file) form.append("file", file);
     form.append("text", text);
     form.append("language", language);
     form.append("level", level);
     form.append("view", view);
-    setProgress({ stage: "reading", detail: "" });
+    setLines([]);
+    setProgress("reading");
+    cancelled.current = false;
     try {
       const r = await fetch("/api/labs", { method: "POST", body: form });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.detail ?? T.server_error);
-      setReady(await follow(body.job));
+      job.current = body.job;
+      const id = await follow(body.job);
+      setReady(id);
+      await openWhenQuiet(id);
     } catch (err) {
-      setError((err as Error).message);
-    } finally {
+      const message = (err as Error).message;
+      setError(message);
       setProgress(null);
+      tima.current?.say(M.failed({ detail: "" }), { interrupt: true });
     }
   };
 
-  const again = () => { setReady(null); setFile(null); setText(""); };
+  const stay = () => { cancelled.current = true; setOpening(null); setProgress(null); };
+  const again = () => { setReady(null); setFile(null); setText(""); setLines([]); };
 
-  if (ready) return <section className="maker" aria-label="Create"><Ready T={T} id={ready} onAgain={again} /></section>;
-  if (progress) {
-    const at = Math.max(0, STAGES.indexOf(progress.stage));
-    return (
-      <section className="maker" aria-label="Create">
-        <div className="progress" aria-live="polite">
-          <p className="stage">{T[`stage_${STAGES[at]}` as keyof Strings]}</p>
-          <div className="meter"><i style={{ width: `${PROGRESS[at]}%` }} /></div>
-          <div className="muted">{progress.detail}</div>
-        </div>
-      </section>
-    );
-  }
+  const working = progress !== null;
   return (
-    <section className="maker" aria-label="Create">
-      <form onSubmit={submit}>
-        <label className={`drop ${over ? "over" : ""} ${file ? "has-file" : ""}`}
-          onDragEnter={(e) => { e.preventDefault(); setOver(true); }} onDragOver={(e) => { e.preventDefault(); setOver(true); }}
-          onDragLeave={() => setOver(false)} onDrop={drop}>
-          <span className="icon" aria-hidden="true">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
-          </span>
-          <b>{file?.name ?? T.drop}</b>
-          <span className="muted">{file ? T.change_file : T.drop_hint}</span>
-          <input type="file" name="file" accept={ACCEPT} hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-        </label>
-
-        <div className="more">
-          <button type="button" className="link" onClick={() => setOpen((o) => ({ ...o, paste: !o.paste }))}>{T.or_paste}</button>
-          <button type="button" className="link" onClick={() => setOpen((o) => ({ ...o, options: !o.options }))}>{T.options}</button>
-        </div>
-
-        {open.paste && (
-          <div className="reveal">
-            <textarea className="lesson" name="text" placeholder={T.paste_placeholder} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
-          </div>
+    <section className={`maker ${working ? "working" : ""}`} aria-label="Create">
+      {/* Tima lives here from the start, hidden until the lab is being made */}
+      <div className="agent" hidden={!working}>
+        <div ref={root} />
+        <div className="meter"><i style={{ width: `${PROGRESS[Math.max(0, STAGES.indexOf(progress ?? "reading"))]}%` }} /></div>
+        <ol className="journal" aria-live="polite">
+          {lines.slice(0, -1).slice(-3).map((line, i) => (
+            <li key={`${i}-${line.text}`} className={line.who}>
+              <span className="mark" aria-hidden="true">{line.who === "you" ? "›" : "✓"}</span>
+              <span>{line.who === "you" ? `${M.you} : ` : ""}{line.text}</span>
+            </li>
+          ))}
+        </ol>
+        {opening !== null ? (
+          <div className="opening">{M.opening} {opening} s · <button type="button" className="link" onClick={stay}>{M.stay}</button></div>
+        ) : (
+          <form className="ask-tima" onSubmit={(e) => { e.preventDefault(); const q = new FormData(e.currentTarget).get("q")?.toString().trim(); if (q) { askTima(q); e.currentTarget.reset(); } }}>
+            <input name="q" placeholder={M.ask} autoComplete="off" />
+            <button type="submit" className="btn primary">{M.send}</button>
+          </form>
         )}
+      </div>
 
-        {open.options && (
-          <div className="reveal fields">
-            <label><span>{T.language}</span>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                <option value="auto">{T.same_as_lesson}</option>
-                <option value="fr">Français</option>
-                <option value="en">English</option>
-                <optgroup label={T.other_languages}>
-                  {OTHER_LANGUAGES.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
-                </optgroup>
-              </select>
-            </label>
-            <label><span>{T.level}</span>
-              <input value={level} placeholder={T.level_placeholder} onChange={(e) => setLevel(e.target.value)} />
-            </label>
-            <div className="wide">
-              <label style={{ marginBottom: 6 }}><span>{T.view}</span></label>
-              <div className="seg" role="group">
-                {(["auto", "2d", "3d"] as View[]).map((v) => (
-                  <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{v === "auto" ? T.view_auto : v.toUpperCase()}</button>
-                ))}
+      {!working && ready && <Ready T={T} id={ready} onAgain={again} />}
+      {!working && !ready && (
+        <form onSubmit={submit}>
+          <label className={`drop ${over ? "over" : ""} ${file ? "has-file" : ""}`}
+            onDragEnter={(e) => { e.preventDefault(); setOver(true); }} onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+            onDragLeave={() => setOver(false)} onDrop={drop}>
+            <span className="icon" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 16V4M7 9l5-5 5 5" /><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3" /></svg>
+            </span>
+            <b>{file?.name ?? T.drop}</b>
+            <span className="muted">{file ? T.change_file : T.drop_hint}</span>
+            <input type="file" name="file" accept={ACCEPT} hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+          </label>
+
+          <div className="more">
+            <button type="button" className="link" onClick={() => setOpen((o) => ({ ...o, paste: !o.paste }))}>{T.or_paste}</button>
+            <button type="button" className="link" onClick={() => setOpen((o) => ({ ...o, options: !o.options }))}>{T.options}</button>
+          </div>
+
+          {open.paste && (
+            <div className="reveal">
+              <textarea className="lesson" name="text" placeholder={T.paste_placeholder} value={text} onChange={(e) => setText(e.target.value)} autoFocus />
+            </div>
+          )}
+
+          {open.options && (
+            <div className="reveal fields">
+              <label><span>{T.language}</span>
+                <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+                  <option value="auto">{T.same_as_lesson}</option>
+                  <option value="fr">Français</option>
+                  <option value="en">English</option>
+                  <optgroup label={T.other_languages}>
+                    {OTHER_LANGUAGES.map(([value, name]) => <option key={value} value={value}>{name}</option>)}
+                  </optgroup>
+                </select>
+              </label>
+              <label><span>{T.level}</span>
+                <input value={level} placeholder={T.level_placeholder} onChange={(e) => setLevel(e.target.value)} />
+              </label>
+              <div className="wide">
+                <label style={{ marginBottom: 6 }}><span>{T.view}</span></label>
+                <div className="seg" role="group">
+                  {(["auto", "2d", "3d"] as View[]).map((v) => (
+                    <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{v === "auto" ? T.view_auto : v.toUpperCase()}</button>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <button className="btn primary go" type="submit">{T.create}</button>
-        {error && <div className="error" role="alert">{error}</div>}
-      </form>
+          <button className="btn primary go" type="submit">{T.create}</button>
+          {offline && <div className="notice">{T.unreachable}</div>}
+          {error && <div className="error" role="alert">{error}</div>}
+        </form>
+      )}
     </section>
   );
 }

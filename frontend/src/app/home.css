@@ -65,3 +65,28 @@ textarea.lesson { width: 100%; min-height: 140px; padding: 12px 14px; border-rad
 footer { color: var(--muted); font-size: 13px; text-align: center; padding: 56px 0 40px; }
 footer a { color: inherit; }
 @media (prefers-reduced-motion: reduce) { .drop, .labs a, .meter i { transition: none; } }
+
+/* while the lab is made: Tima, what she has said, and a box to talk with her */
+.maker.working { max-width: 560px; }
+.agent { display: grid; justify-items: center; gap: 14px; padding: 12px 4px 4px; text-align: center; }
+.agent[hidden] { display: none; }
+.agent .tima { position: relative; left: auto; bottom: auto; flex-direction: column; align-items: center; gap: 12px; max-width: 100%; pointer-events: auto; }
+.agent .tima-orb { width: 96px; height: 96px; }
+.agent .tima-orb .tima-core { inset: 11px; }
+.agent .tima-bubble { max-width: 480px; border-radius: 18px; text-align: center; font-size: 17px; line-height: 1.45; padding: 12px 18px; }
+.agent .tima-controls { position: static; flex-direction: row; justify-content: center; opacity: 1; transform: none; order: 3; }
+.agent .tima-ear { position: static; order: 4; }
+.agent .meter { width: 100%; max-width: 280px; }
+.journal { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; width: 100%; max-width: 480px; text-align: left; }
+.journal li { display: grid; grid-template-columns: 16px 1fr; gap: 6px; align-items: baseline; font-size: 13px; line-height: 1.4; color: var(--muted); animation: journal-in .35s ease; }
+.journal .mark { color: var(--ok); font-weight: 700; }
+.journal li.you { color: var(--ink); }
+.journal li.you .mark { color: var(--accent); }
+@keyframes journal-in { from { opacity: 0; transform: translateY(4px); } }
+.ask-tima { display: flex; gap: 8px; width: 100%; max-width: 480px; }
+.ask-tima input { flex: 1; min-width: 0; padding: 11px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--ground); color: var(--ink); }
+.opening { font-size: 15px; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .journal li { animation: none; } }
+
+.notice { margin-top: 10px; padding: 10px 12px; border-radius: 12px; font-size: 13px; text-align: center;
+  color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }

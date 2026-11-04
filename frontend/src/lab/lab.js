@@ -840,6 +840,14 @@ function showIntro() {
   $("#intro-start").onclick = () => open(false);
   $("#intro-quiet").onclick = () => open(true);
   $("#intro-start").focus();
+  // straight from the teacher's page, which has just made this lab: the tap there still counts,
+  // so the lab opens by itself and Tima speaks at once
+  const params = new URLSearchParams(location.search);
+  if (params.get("fresh") === "1" && navigator.userActivation?.hasBeenActive) {
+    params.delete("fresh");
+    history.replaceState(null, "", `${location.pathname}?${params}`); // a reload shows the intro again
+    open(false);
+  }
 }
 
 // ---------------------------------------------------------------- translation (Muse Spark)

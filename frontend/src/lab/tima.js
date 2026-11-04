@@ -84,11 +84,15 @@ export const lines = (lang) => LINES[lang] ?? LINES.en;
 
 // ---------------------------------------------------------------- Tima
 const FOLLOW_UP_MS = 8000; // after an answer, she listens without needing her name
+const ECHO_MS = 2500; // recognisers deliver words late: her own voice can arrive after she stops
 
 export class Tima {
   /** root: the element she lives in. onAsk(question) answers a question; onLook() asks what
    *  she sees; onSentence(line) runs as she starts each sentence (to light up the parts she
-   *  names). live: what the server offers, { ears: Meta's realtime ears?, voice: "voxtral" | "browser" }. */
+   *  names). live: what the server offers, { ears: Meta's realtime ears?, voice: "voxtral" | "browser" }.
+   *  @param {HTMLElement} root
+   *  @param {{ lang?: string, t?: Record<string, any>, onAsk?: (question: string) => void, onLook?: (() => void) | null,
+   *            onSentence?: (line: string) => void, live?: { ears?: boolean, voice?: string } }} [options] */
   constructor(root, { lang = "fr", t = {}, onAsk = () => {}, onLook = null, onSentence = () => {}, live = {} } = {}) {
     Object.assign(this, { root, lang, t, onAsk, onLook, onSentence });
     this.queue = [];
@@ -165,6 +169,7 @@ export class Tima {
       this.speaking = false;
       this.mark("speaking", false);
       this.line = "";
+      this.quietAt = Date.now(); // the microphone may still hand back her last words for a moment
       this.onSentence("");
       if (this.followUp) { this.followUp = false; this.attend(FOLLOW_UP_MS, { quiet: true }); }
       clearTimeout(this.hideTimer);
@@ -288,18 +293,23 @@ export class Tima {
     // any alternative may hold her name: recognisers often write it as another word
     const said = alternatives.find((alt) => WAKE.test(plain(alt))) ?? text;
     const match = WAKE.exec(plain(said));
+    const ownVoice = (words) => (this.speaking || Date.now() - (this.quietAt ?? 0) < ECHO_MS) && echoes(words, this.heardSelf);
     if (!this.awake) this.overhear(text);
     if (!this.awake && match) {
-      if (this.speaking && echoes(said, this.heardSelf)) return; // that was her own voice
+      if (ownVoice(said)) return; // that was her own voice, through the speakers
+      const phrase = plain(said).slice(0, match.index + match[0].length);
+      if (this.wokeBy && plain(said).startsWith(this.wokeBy)) return; // the same phrase, sent again: it already woke her
+      this.wokeBy = phrase;
       this.hush();
       this.overhear("");
       this.attend(9000, { quiet: true });
-      this.chime();
-      if (!said.slice(match.index + match[0].length).trim()) this.say(this.t.tima_yes ?? "?"); // "Oui ?": she heard
+      this.chime(); // a chime and a look, not a spoken "Yes?": a word of hers could wake her again
+      this.show(this.t.tima_listening);
     }
+    if (isFinal) this.wokeBy = ""; // a new phrase may wake her again
     if (!this.awake) return;
     const question = (match ? said.slice(match.index + match[0].length) : text).trim();
-    if (this.speaking && question && echoes(question, this.heardSelf)) return; // her own "Oui ?"
+    if (question && ownVoice(question)) return;
     if (question) { this.show(question); if (this.speaking) this.hush(); } // live: the words appear as they are said; she stops to listen
     if (isFinal && question.length > 2) { this.sleep(); this.onAsk(question); }
   }

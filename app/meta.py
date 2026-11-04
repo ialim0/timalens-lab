@@ -29,12 +29,17 @@ class MetaError(RuntimeError):
     """A Meta model could not do what was asked; the message says why."""
 
 
+UNREACHABLE = "Meta's API cannot be reached from this network (the connection times out): try another network, or the deployed app."
+# a model may think for minutes, but a connection that does not open in seconds will not open
+TIMEOUT = httpx.Timeout(600, connect=8)
+
+
 def _client(cfg: Settings, *, planner: bool = False) -> OpenAI:
     if planner and cfg.planner_is_open_weight:
-        return OpenAI(base_url=cfg.planner_base_url, api_key=cfg.planner_api_key or "none", timeout=600)
+        return OpenAI(base_url=cfg.planner_base_url, api_key=cfg.planner_api_key or "none", timeout=TIMEOUT, max_retries=1)
     if not cfg.api_key:
         raise MetaError("MODEL_API_KEY is not set: create a key in the Meta Model API dashboard.")
-    return OpenAI(base_url=cfg.base_url, api_key=cfg.api_key, timeout=600, max_retries=3)
+    return OpenAI(base_url=cfg.base_url, api_key=cfg.api_key, timeout=TIMEOUT, max_retries=1)
 
 
 # ---------------------------------------------------------------- Muse Spark: JSON out

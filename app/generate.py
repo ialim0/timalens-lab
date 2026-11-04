@@ -107,9 +107,11 @@ def check(lab: dict[str, Any], node: str) -> list[str]:
 
 
 def lab_from_lesson(cfg: Settings, text: str, *, language: str = "auto", level: str = "", view: str = "auto",
-                    progress: Callable[[str, str], None] = lambda stage, detail="": None) -> dict[str, Any]:
+                    progress: Callable[[str, str], None] = lambda stage, detail="": None,
+                    note: Callable[..., None] = lambda kind, **facts: None) -> dict[str, Any]:
     """A checked lab for a lesson. Raises Unsupported for a lesson the lab cannot teach.
-    view: "2d" or "3d" when the teacher chose; "auto" lets Muse Spark choose from the lesson."""
+    view: "2d" or "3d" when the teacher chose; "auto" lets Muse Spark choose from the lesson.
+    note(kind, **facts) reports each step as it happens (Tima tells the teacher about it)."""
     wishes = [f"level: {level}" if level else "", f"write the lab in {language}" if language not in ("", "auto") else "",
               f'the teacher wants "view": "{view}"' if view in ("2d", "3d") else ""]
     wishes = "; ".join(w for w in wishes if w)
@@ -118,13 +120,18 @@ def lab_from_lesson(cfg: Settings, text: str, *, language: str = "auto", level: 
     problems: list[str] = []
     for attempt in range(1, MAX_TRIES + 1):
         progress("designing", f"Muse Spark, attempt {attempt}")
+        note("designing", attempt=attempt)
         lab = chat_json(cfg, messages, schema=SCHEMA, name="circuits_lab")
         if not isinstance(lab, dict):
             raise MetaError("the planner did not return a JSON object")
         if lab.get("lab") == "unsupported":
             raise Unsupported(lab.get("reason") or "this lesson is not about electric circuits")
+        note("designed", title=lab.get("title", ""), circuits=len(lab.get("presets") or []), activities=len(lab.get("activities") or []),
+             challenges=len(lab.get("challenges") or []), view=lab.get("view", ""), objectives=(lab.get("objectives") or [])[:3])
         progress("checking", "laying out and solving every circuit")
+        note("checking")
         problems = check(lab, cfg.node)
+        note("problems" if problems else "checked", count=len(problems))
         if not problems:
             lab.setdefault("version", 1)
             if view in ("2d", "3d"):

@@ -77,6 +77,41 @@ def answer(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
     return (reply.choices[0].message.content or "").strip()
 
 
+TEACHER_RULES = """\
+You are Tima, the voice of TimaLens Lab. A teacher has just given you a lesson, and Muse Spark
+is designing an interactive electric-circuits lab from it, in the background, right now (the
+circuits, guided experiments, challenges and a quiz; a physics engine then checks every circuit).
+Talk with the teacher while they wait: answer their questions about their lesson, about how the
+lab will use it, or about teaching it. Use their lesson; never invent what it does not say.
+Your answer is spoken aloud: 2 to 4 short sentences, warm and concrete, no lists, no markdown.
+"""
+
+
+def while_making(cfg: Settings, lesson: str, draft: dict[str, Any] | None, stage: str, question: str,
+                 history: list[dict[str, str]], *, language: str = "") -> str:
+    """Tima's answer to the teacher while the lab is being made."""
+    status = f"The lab is at this stage: {stage or 'reading the lesson'}."
+    if draft:
+        status += " Muse Spark's current draft: " + json.dumps(draft, ensure_ascii=False)
+    messages: list[dict[str, Any]] = [
+        {"role": "developer", "content": TEACHER_RULES},
+        {"role": "developer", "content": ("The lesson:\n" + lesson[:60_000]) if lesson else "The lesson is still being read."},
+        {"role": "developer", "content": status},
+    ]
+    for turn in history[-8:]:
+        if turn.get("role") in ("user", "assistant") and turn.get("content"):
+            messages.append({"role": turn["role"], "content": turn["content"][:2000]})
+    speak = LANGUAGES.get(language[:2], "")
+    if speak:
+        messages.append({"role": "developer", "content": f"Answer in {speak}."})
+    messages.append({"role": "user", "content": question})
+    kwargs: dict[str, Any] = {"model": cfg.planner_model, "messages": messages}
+    if not cfg.planner_is_open_weight:
+        kwargs["reasoning_effort"] = "low"
+    reply = _client(cfg, planner=True).chat.completions.create(**kwargs)
+    return (reply.choices[0].message.content or "").strip()
+
+
 def stream(cfg: Settings, lab: dict[str, Any], lesson: str, question: str,
            history: list[dict[str, str]], context: dict[str, Any], *, language: str = "", image: str = "") -> Iterator[str]:
     """Muse Spark's answer as it is written: Tima starts speaking its first sentence at once."""

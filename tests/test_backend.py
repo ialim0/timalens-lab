@@ -22,6 +22,7 @@ LESSON_PDF = ROOT / "samples" / "lecon_loi_ohm.pdf"
 @pytest.fixture(autouse=True)
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setenv("DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(server, "reachable", lambda host, port=443: True)  # tests never touch the network
     server.jobs.clear()
     return tmp_path
 
@@ -389,3 +390,61 @@ def test_the_live_ears_need_a_key(monkeypatch):
     with TestClient(server.app).websocket_connect("/api/live") as ws:
         ws.send_json({"language": "en"})
         assert ws.receive_json()["type"] == "error"
+
+
+# ---------------------------------------------------------------- Tima while the lab is made
+def test_the_job_tells_its_story_and_keeps_the_lesson_private(monkeypatch):
+    lab = copy.deepcopy(SAMPLE)
+    monkeypatch.setattr(generate, "chat_json", lambda cfg, messages, **kw: lab)
+    client = TestClient(server.app)
+    job = client.post("/api/labs", data={"text": "La loi d'Ohm\n" + "Une résistance freine le courant. " * 20}).json()["job"]
+    for _ in range(200):
+        status = client.get(f"/api/jobs/{job}").json()
+        if status["stage"] in ("ready", "failed"):
+            break
+        time.sleep(0.05)
+    kinds = [e["kind"] for e in status["events"]]
+    assert kinds == ["reading", "read", "designing", "designed", "checking", "checked", "ready"], kinds
+    read = status["events"][1]
+    assert read["title"] == "La loi d'Ohm" and read["words"] > 100
+    assert status["events"][3]["challenges"] == len(SAMPLE["challenges"])
+    assert "lesson" not in status  # the lesson is not sent back on every poll
+
+
+def test_the_teacher_can_ask_tima_while_waiting(monkeypatch):
+    seen = {}
+
+    class Fake:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kw):
+                    seen.update(kw)
+                    msg = type("M", (), {"content": "Ton cours insiste sur U = R × I."})
+                    return type("R", (), {"choices": [type("C", (), {"message": msg})]})
+
+    monkeypatch.setattr(tutor, "_client", lambda cfg, planner=False: Fake)
+    server.jobs["j1"] = {"stage": "designing", "events": [], "lesson": "La loi d'Ohm : U = R × I.", "draft": {"title": "Ohm"}}
+    r = TestClient(server.app).post("/api/jobs/j1/ask", json={"question": "Sur quoi insiste mon cours ?", "language": "fr"})
+    assert r.json()["answer"].startswith("Ton cours")
+    assert "U = R × I" in seen["messages"][1]["content"] and "designing" in seen["messages"][2]["content"]
+    assert TestClient(server.app).post("/api/jobs/nope/ask", json={"question": "?"}).status_code == 404
+
+
+def test_an_unreachable_meta_is_said_plainly(monkeypatch):
+    import httpx
+    import openai
+
+    class Fake:
+        class chat:
+            class completions:
+                @staticmethod
+                def create(**kw):
+                    raise openai.APITimeoutError(request=httpx.Request("POST", "https://api.meta.ai/v1/chat/completions"))
+
+    monkeypatch.setattr(tutor, "_client", lambda cfg, planner=False: Fake)
+    monkeypatch.setattr(server, "reachable", lambda host, port=443: False)
+    client = TestClient(server.app)
+    assert client.get("/api/health").json()["meta_reachable"] is False
+    r = client.post("/api/labs/sample-ohm-en/tutor", json={"question": "?"})
+    assert r.status_code == 503 and "cannot be reached from this network" in r.json()["detail"]

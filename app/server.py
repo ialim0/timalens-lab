@@ -12,16 +12,20 @@ import itertools
 import json
 import os
 import re
+import socket
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from openai import APIConnectionError
 from openai import APIError as ModelAPIError
 from pydantic import BaseModel
 from starlette.concurrency import run_in_threadpool
@@ -29,7 +33,7 @@ from starlette.middleware.gzip import GZipMiddleware
 
 from app import generate, lesson, tutor, voice
 from app.config import ROOT, settings
-from app.meta import MetaError, read_pages, transcribe
+from app.meta import UNREACHABLE, MetaError, read_pages, transcribe
 
 # the web app: a static Next.js export (frontend/), built by `make build` or the Dockerfile
 WEB = Path(os.environ.get("WEB_DIR", ROOT / "frontend" / "out"))
@@ -90,8 +94,32 @@ def read_lab(lab_id: str) -> tuple[dict[str, Any], str]:
 @app.get("/api/health")
 def health() -> dict[str, Any]:
     cfg = settings()
+    meta = urlparse(cfg.planner_base_url or cfg.base_url).hostname or ""
     return {"meta_key": bool(cfg.api_key), "planner": cfg.planner_model, "open_weight_planner": cfg.planner_is_open_weight,
-            "live_ears": bool(cfg.api_key), "voice": "voxtral" if cfg.tts_api_key else "browser"}
+            "live_ears": bool(cfg.api_key), "voice": "voxtral" if cfg.tts_api_key else "browser", "meta_reachable": reachable(meta)}
+
+
+_reach: dict[str, tuple[float, bool]] = {}
+
+
+def reachable(host: str, port: int = 443) -> bool:
+    """Can this server open a connection to the model API? Checked at most once a minute."""
+    if not host:
+        return False
+    at, ok = _reach.get(host, (0.0, False))
+    if time.monotonic() - at > 60:
+        try:
+            socket.create_connection((host, port), timeout=3).close()
+            ok = True
+        except OSError:
+            ok = False
+        _reach[host] = (time.monotonic(), ok)
+    return ok
+
+
+def problem(exc: Exception) -> str:
+    """What to tell the teacher when a model call fails."""
+    return UNREACHABLE if isinstance(exc, APIConnectionError) else str(exc)
 
 
 @app.get("/api/labs/{lab_id}")
@@ -161,8 +189,25 @@ def _read_upload(name: str, data: bytes) -> str:
         return lesson.extract_text(path, transcriber=lambda wav: transcribe(cfg, wav), reader=lambda pages: read_pages(cfg, pages))
 
 
+def _lesson_title(text: str) -> str:
+    """The lesson's first real line: usually its title."""
+    for line in text.splitlines():
+        line = line.strip(" #*\t")
+        if 4 <= len(line) <= 90:
+            return line
+    return ""
+
+
 def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, language: str, level: str, view: str = "auto") -> None:
+    """Make the lab in the background. Each step goes into the job's events, as facts (not
+    sentences): the teacher's page has Tima say them, in the teacher's language."""
     job = jobs[job_id]
+
+    def note(kind: str, **facts: Any) -> None:
+        job["events"].append({"kind": kind, **facts})
+        if kind == "designed":
+            job["draft"] = {k: facts.get(k) for k in ("title", "objectives")}
+
     try:
         def progress(stage: str, detail: str = "") -> None:
             job.update(stage=stage, detail=detail)
@@ -172,25 +217,34 @@ def _run_generation(job_id: str, upload: tuple[str, bytes] | None, text: str, la
                 text = _read_upload(*upload)
             except lesson.LessonError as exc:
                 job.update(stage="failed", detail=str(exc))
+                note("failed", detail=str(exc))
                 return
         text = text.strip()
         if len(text) < 200:
             job.update(stage="failed", detail="the lesson is too short: give at least a few paragraphs")
+            note("failed", detail="too short")
             return
+        job["lesson"] = text[:60_000]  # Tima answers the teacher's questions from it while the lab is made
+        note("read", chars=len(text), words=len(text.split()), title=_lesson_title(text))
 
         # the same lesson asked again (a second class, a retry on a bad connection) is not
         # designed twice: its lab is already there
         key = hashlib.sha256(f"{language}|{level}|{view}|{text}".encode()).hexdigest()[:12]
         if (labs_dir() / f"{key}.json").exists():
+            note("reused")
             job.update(stage="ready", lab=key, detail="already made from this lesson")
+            note("ready", lab=key)
             return
-        lab = generate.lab_from_lesson(settings(), text, language=language, level=level, view=view, progress=progress)
+        lab = generate.lab_from_lesson(settings(), text, language=language, level=level, view=view, progress=progress, note=note)
         (labs_dir() / f"{key}.json").write_text(json.dumps({"lab": lab, "lesson": text[:200_000]}, ensure_ascii=False))
         job.update(stage="ready", lab=key)
+        note("ready", lab=key, title=lab.get("title", ""))
     except generate.Unsupported as exc:
         job.update(stage="unsupported", detail=str(exc))
+        note("unsupported", detail=str(exc))
     except Exception as exc:  # reported to the teacher, never swallowed
-        job.update(stage="failed", detail=str(exc)[:500])
+        job.update(stage="failed", detail=problem(exc)[:500])
+        note("failed", detail=problem(exc)[:300])
 
 
 @app.post("/api/labs")
@@ -206,16 +260,40 @@ async def create_lab(file: UploadFile | None = File(None), text: str = Form(""),
     elif len(text.strip()) < 200:
         raise HTTPException(400, "the lesson is too short: give at least a few paragraphs")
     job_id = uuid.uuid4().hex[:12]
-    jobs[job_id] = {"stage": "reading", "detail": upload[0] if upload else ""}
+    kind = Path(upload[0]).suffix.lower().lstrip(".") if upload else "text"
+    jobs[job_id] = {"stage": "reading", "detail": upload[0] if upload else "", "events": [{"kind": "reading", "source": kind}]}
     threading.Thread(target=_run_generation, args=(job_id, upload, text, language, level, view if view in ("2d", "3d") else "auto"), daemon=True).start()
     return {"job": job_id}
+
+
+PRIVATE_JOB_KEYS = {"lesson", "draft"}  # for Tima's answers, not sent on every poll
 
 
 @app.get("/api/jobs/{job_id}")
 def job_status(job_id: str) -> dict[str, Any]:
     if job_id not in jobs:
         raise HTTPException(404, "no such job")
-    return jobs[job_id]
+    return {k: v for k, v in jobs[job_id].items() if k not in PRIVATE_JOB_KEYS}
+
+
+class JobQuestion(BaseModel):
+    question: str
+    history: list[dict[str, str]] = []
+    language: str = ""
+
+
+@app.post("/api/jobs/{job_id}/ask")
+def ask_while_making(job_id: str, body: JobQuestion) -> dict[str, str]:
+    """The teacher talks with Tima while the lab is being made, about the lesson and the lab."""
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(404, "no such job")
+    try:
+        answer = tutor.while_making(settings(), job.get("lesson", ""), job.get("draft"), job.get("stage", ""), body.question[:2000],
+                                    body.history, language=body.language)
+    except (MetaError, ModelAPIError) as exc:
+        raise HTTPException(503, problem(exc)) from exc
+    return {"answer": answer}
 
 
 class TutorQuestion(BaseModel):
@@ -241,7 +319,7 @@ def ask_tutor(lab_id: str, body: TutorQuestion) -> dict[str, str]:
     try:
         return {"answer": tutor.answer(settings(), **args)}
     except (MetaError, ModelAPIError) as exc:
-        raise HTTPException(503, str(exc)) from exc
+        raise HTTPException(503, problem(exc)) from exc
 
 
 @app.post("/api/labs/{lab_id}/tutor/stream")
@@ -252,7 +330,7 @@ def ask_tutor_streaming(lab_id: str, body: TutorQuestion) -> StreamingResponse:
     try:
         first = next(parts, "")  # a missing key fails here, as a proper 503
     except (MetaError, ModelAPIError) as exc:
-        raise HTTPException(503, str(exc)) from exc
+        raise HTTPException(503, problem(exc)) from exc
 
     def events():
         try:

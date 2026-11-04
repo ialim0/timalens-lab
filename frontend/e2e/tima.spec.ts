@@ -25,7 +25,7 @@ test.describe("Tima, the voice guide", () => {
     await expect(page.locator(".tima")).toHaveClass(/ear/);
 
     await hear(page, "hey Timah", false); // talking over her welcome
-    await expect.poll(() => said(page)).toContain("Yes?");
+    await expect(page.locator(".tima")).toHaveClass(/listening/); // a chime and a look, no spoken "Yes?"
     await hear(page, "why are the bulbs dim", true);
 
     await expect.poll(() => asked.length).toBe(1);

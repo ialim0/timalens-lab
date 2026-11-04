@@ -112,6 +112,7 @@ export const TEACHER = {
     unsupported: "Ce cours ne parle pas de circuits électriques :", failed: "La création a échoué :",
     ready: "Ton labo est prêt", open_lab: "Ouvrir le labo", copy: "Copier", copied: "Copié ✓", another: "Nouveau labo",
     share_text: "Mon laboratoire TimaLens :",
+    unreachable: "L'API de Meta est injoignable depuis ce réseau : la création échouera. Essaie un autre réseau (partage de connexion) ou la version en ligne.",
   },
   en: {
     page_title: "TimaLens Lab · Turn a lesson into a lab",
@@ -135,5 +136,54 @@ export const TEACHER = {
     unsupported: "This lesson is not about electric circuits:", failed: "Making the lab failed:",
     ready: "Your lab is ready", open_lab: "Open the lab", copy: "Copy", copied: "Copied ✓", another: "New lab",
     share_text: "My TimaLens lab:",
+    unreachable: "Meta's API can't be reached from this network, so making a lab will fail. Try another network (a phone hotspot) or the online version.",
+  },
+};
+
+// ---------------------------------------------------------------- Tima, while a lab is made
+// What she says about each step of the generation (the server sends facts, not sentences), and
+// what she says when Muse Spark is quiet for a while. Every line describes what is really happening.
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const AUDIO = new Set(["mp3", "wav", "m4a", "ogg", "webm", "mp4", "mov", "aac", "flac"]);
+const PHOTO = new Set(["jpg", "jpeg", "png", "webp"]);
+
+export const MAKING = {
+  fr: {
+    reading: (e) => (AUDIO.has(e.source) ? "J'écoute l'enregistrement de ton cours…" : PHOTO.has(e.source) ? "Je lis la photo de ton cours…" : "Je lis ton cours…"),
+    read: (e) => `${e.title ? `J'ai lu « ${e.title} »` : "J'ai lu ton cours"} : ${e.words} mots. Muse Spark va en faire un labo. Pendant ce temps, pose-moi tes questions.`,
+    designing: (e) => (e.attempt > 1 ? `Muse Spark corrige son labo, essai ${e.attempt}.` : "Muse Spark imagine les circuits, les expériences et les défis."),
+    designed: (e) => `Premier jet : « ${e.title} », avec ${plural(e.circuits, "circuit", "circuits")}, ${plural(e.activities, "expérience", "expériences")} et ${plural(e.challenges, "défi", "défis")}${e.view ? `, en ${String(e.view).toUpperCase()}` : ""}.`,
+    checking: () => "Je vérifie chaque circuit avec le moteur physique.",
+    problems: (e) => `Le moteur a trouvé ${plural(e.count, "problème", "problèmes")}. Muse Spark corrige.`,
+    checked: () => "Tout est vérifié : chaque défi est faisable.",
+    reused: () => "Ce cours a déjà son labo : je le reprends.",
+    ready: () => "Ton labo est prêt. Je l'ouvre !",
+    unsupported: () => "Ce cours ne parle pas de circuits électriques : je ne peux pas encore en faire un labo.",
+    failed: (e) => `Je n'ai pas pu terminer le labo. ${e.detail ?? ""}`,
+    idle: [
+      "Muse Spark travaille encore : il relit les exemples et les erreurs que ton cours signale.",
+      "Chaque défi doit être faisable avec les réglages que l'élève peut toucher : c'est ce qui prend du temps.",
+      "Presque fini. Demande-moi comment tes élèves vont utiliser ce labo.",
+    ],
+    ask: "Pose-moi une question sur ton cours…", send: "Envoyer", you: "Toi", opening: "Ouverture du labo dans", stay: "Rester ici",
+  },
+  en: {
+    reading: (e) => (AUDIO.has(e.source) ? "Listening to the recording of your lesson…" : PHOTO.has(e.source) ? "Reading the photo of your lesson…" : "Reading your lesson…"),
+    read: (e) => `${e.title ? `I've read “${e.title}”` : "I've read your lesson"}: ${e.words} words. Muse Spark will turn it into a lab. Meanwhile, ask me anything.`,
+    designing: (e) => (e.attempt > 1 ? `Muse Spark is fixing its lab, attempt ${e.attempt}.` : "Muse Spark is imagining the circuits, experiments and challenges."),
+    designed: (e) => `First draft: “${e.title}”, with ${plural(e.circuits, "circuit", "circuits")}, ${plural(e.activities, "experiment", "experiments")} and ${plural(e.challenges, "challenge", "challenges")}${e.view ? `, in ${String(e.view).toUpperCase()}` : ""}.`,
+    checking: () => "I'm checking every circuit with the physics engine.",
+    problems: (e) => `The engine found ${plural(e.count, "problem", "problems")}. Muse Spark is fixing them.`,
+    checked: () => "Everything checks out: every challenge can be met.",
+    reused: () => "This lesson already has its lab: I'm reopening it.",
+    ready: () => "Your lab is ready. Opening it!",
+    unsupported: () => "This lesson isn't about electric circuits, so I can't make a lab from it yet.",
+    failed: (e) => `I couldn't finish the lab. ${e.detail ?? ""}`,
+    idle: [
+      "Muse Spark is still at work: it's going over your lesson's examples and the mistakes it warns about.",
+      "Every challenge must be solvable with the controls a student can touch: that's what takes time.",
+      "Almost there. Ask me how your students will use this lab.",
+    ],
+    ask: "Ask me about your lesson…", send: "Send", you: "You", opening: "Opening the lab in", stay: "Stay here",
   },
 };
