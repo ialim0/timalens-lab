@@ -9,7 +9,7 @@
 
 **From watching a lesson to experiencing it.** · [Lire en français](README.fr.md) · [Demo script](docs/DEMO.md)
 
-> Built for the Meta Global AI Developer Hackathon: see [SUBMISSION.md](SUBMISSION.md). **Live: https://timalens-lab-dapbuzyhfa-uc.a.run.app** · teachers: [timalens-lab-dapbuzyhfa-uc.a.run.app/teach](https://timalens-lab-dapbuzyhfa-uc.a.run.app/teach)
+> Built for the Meta Global AI Developer Hackathon: see [SUBMISSION.md](SUBMISSION.md). **Live: https://lab.timalens.com** · teachers: [lab.timalens.com/teach](https://lab.timalens.com/teach)
 
 | Tima tells the teacher what Muse Spark is doing, and thinking | Students build and experiment, Tima guides them by voice |
 |---|---|
