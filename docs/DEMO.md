@@ -29,7 +29,7 @@
 3. **Predict first.** Answer "Si on double la tension… ?"; Tima says if it was right, and why.
 4. **Measure, hands-free.** Tap the battery and slide it to 2, 4, 6 and 8 V. Each new value adds a point by itself and the U(I) line draws itself, slope ≈ 100 Ω; the step moves on when it has enough points. "They *discover* U = R × I from their own data."
 5. **Drag and drop.** Drag a bulb from the tray onto the bench: a glowing beam shows where it lands, and it lights up as it closes the loop ("La lampe L2 s'allume !"). Drag it off the bench to take it away.
-6. **Hands.** Tap ✋: the webcam view shows the hand's skeleton. Pinch a resistor in the tray, carry it onto the bench and open your fingers; open your hand to turn the 3D bench; make a fist and ask Tima a question. "No mouse, no keyboard: the video never leaves the computer."
+6. **Hands.** They are on from the start (the lab asked for the camera with the microphone): the webcam view shows the hand's skeleton. Pinch a resistor in the tray, carry it onto the bench and open your fingers; open your hand to turn the 3D bench; make a fist and ask Tima a question. "No mouse, no keyboard: the video never leaves the computer."
 7. In **Missions**, start the challenge *Allume la DEL sans la griller*.
    - Drag R1 down to 10 Ω: **the LED burns out**, with sparks and smoke, and Tima explains why. "In a real lab this costs a component. Here it costs nothing, and they learn why."
    - Tap the LED, then **Réparer**. Tap R1 and bring it up to 390 Ω: confetti, and Tima: **Bravo, défi réussi !**

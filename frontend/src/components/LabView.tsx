@@ -73,6 +73,7 @@ export default function LabView() {
           <p id="intro-sub" />
           <button type="button" className="btn primary intro-go" id="intro-start" />
           <button type="button" className="intro-quiet" id="intro-quiet" />
+          <p className="intro-note" id="intro-note" />
         </div>
       </div>
     </>

@@ -76,8 +76,10 @@ async function loadLab() {
   const asked = params.get("view");
   if (asked === "3d" || (asked !== "2d" && (lab.view === "3d" || immersiveDevice()))) await setView("3d");
   showIntro();
-  navigator.xr?.isSessionSupported?.("immersive-vr").then((ok) => { $("#vr").hidden = !ok; }).catch(() => {});
+  // desktop browsers say "supported" without a headset: offer VR only in a headset's own browser
+  if (HEADSET.test(navigator.userAgent)) navigator.xr?.isSessionSupported?.("immersive-vr").then((ok) => { $("#vr").hidden = !ok; }).catch(() => {});
 }
+const HEADSET = /OculusBrowser|Quest|Pico|Wolvic|VisionOS/i;
 /** A computer with room and power for the 3D world opens in it; a small phone opens in 2D. */
 const immersiveDevice = () => matchMedia("(min-width: 900px)").matches && (navigator.hardwareConcurrency ?? 4) > 4;
 
@@ -832,13 +834,18 @@ function showIntro() {
   $("#intro-sub").textContent = voice.missions(missionCount());
   $("#intro-start").textContent = t.intro_start;
   $("#intro-quiet").textContent = t.intro_quiet;
+  $("#intro-note").textContent = t.intro_devices;
   intro.hidden = false;
-  const open = (quiet) => {
+  const open = async (quiet) => {
     intro.classList.add("out");
     setTimeout(() => { intro.hidden = true; }, 650);
     tima.start({ quiet });
     bench3d?.flyIn();
+    // hands and voice drive the lab: one permission prompt for both, before it begins
+    const camera = handsWanted();
+    try { (await navigator.mediaDevices.getUserMedia({ video: camera, audio: !quiet })).getTracks().forEach((track) => track.stop()); } catch { /* refused: mouse and keyboard still work */ }
     if (!quiet) tima.toggleWake(true);
+    if (camera) toggleHands(true, { announce: toured() });
     if (toured()) tima.say(voice.welcome(state.lab, missionCount()));
     else setTimeout(guidedTour, 900); // after the camera's swoop: a first visit gets the tour
   };
@@ -934,13 +941,18 @@ async function fillDock() {
 // ---------------------------------------------------------------- hands (the webcam, tracked in the browser)
 let hands = null;
 const GESTURES = ["point", "pinch", "open", "fist"];
-async function toggleHands() {
+const HANDS_KEY = "timalens-hands";
+/** Hand mode is on by default; a student who turns it off keeps it off. */
+const handsWanted = () => { try { return localStorage.getItem(HANDS_KEY) !== "off"; } catch { return true; } };
+async function toggleHands(on = !hands, { announce = true } = {}) {
   const button = $("#hands"), view = $("#hand-view");
-  if (hands) {
+  if (Boolean(hands) === on || button.disabled) return;
+  if (!on) {
     hands.stop();
     hands = window.timalensHands = null;
     bench3d?.setHands(false);
     view.hidden = true;
+    document.body.classList.remove("hands-on");
     button.setAttribute("aria-pressed", "false");
     return;
   }
@@ -955,24 +967,30 @@ async function toggleHands() {
       onGesture: (g) => { for (const chip of $("#gestures").children) chip.classList.toggle("on", chip.dataset.g === g); },
     });
     view.hidden = false;
+    document.body.classList.add("hands-on");
     await control.start();
     hands = window.timalensHands = control; // the end-to-end tests feed it hands
     bench3d?.setHands(true);
     button.setAttribute("aria-pressed", "true");
-    tima?.say(voice.hands, { interrupt: true });
+    if (announce) tima?.say(voice.hands, { interrupt: true });
   } catch (error) {
     view.hidden = true;
+    document.body.classList.remove("hands-on");
     console.warn("hands", error);
     tima?.say(`${state.t.hands_failed} ${error.message ?? error}`, { interrupt: true });
   } finally {
     button.disabled = false;
   }
 }
-$("#hands").addEventListener("click", toggleHands);
+$("#hands").addEventListener("click", () => {
+  const on = !hands;
+  try { localStorage.setItem(HANDS_KEY, on ? "on" : "off"); } catch { /* the choice lasts this visit */ }
+  toggleHands(on);
+});
 
 $("#vr").addEventListener("click", async () => {
   await setView("3d");
-  try { await bench3d?.enterVR(); } catch (error) { console.error(error); }
+  try { await bench3d?.enterVR(); } catch (error) { console.warn("vr", error); tima?.say(state.t.vr_none, { interrupt: true }); }
 });
 
 // ---------------------------------------------------------------- the end: report, video, save

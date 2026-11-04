@@ -27,7 +27,8 @@ as one link (or on WhatsApp), that works on a $50 phone.
 - **Students build real DC circuits** by dragging parts onto a bench, in 2D or in an immersive
   3D world (and in **VR on a Meta Quest**). Bulbs glow with the right brightness, LEDs burn out
   with sparks, meters show real readings.
-- **Students can drive the lab with their hands.** With the ✋ button, the webcam tracks the
+- **Students drive the lab with their hands and voice, from the start.** The lab asks for the camera
+  and the microphone together before it begins (the ✋ button turns the camera off), and tracks the
   hand **in the browser** (MediaPipe: the video never leaves the computer): point to aim (the button
   under the finger lights up, and holding still clicks it), pinch to grab a part and drop it on the
   bench, open the hand to turn the 3D bench, make a fist to talk to Tima.

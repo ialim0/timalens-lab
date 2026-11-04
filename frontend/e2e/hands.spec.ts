@@ -32,6 +32,17 @@ async function startHands(page: Page) {
 }
 
 test.describe("hands", () => {
+  test("the lab begins with the camera on: hand mode is the default, and turning it off is remembered", async ({ page }) => {
+    await openLab(page, "lab=sample-ohm-en&lang=en&view=2d", { hands: true });
+    await expect(page.locator("#hand-view")).toBeVisible();
+    await expect.poll(() => page.evaluate(() => Boolean((window as any).timalensHands)), { timeout: 30_000 }).toBe(true);
+    await expect(page.locator("#hands")).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#vr")).toBeHidden(); // no headset: no VR button
+    await page.locator("#hands").click();
+    await expect(page.locator("#hand-view")).toBeHidden();
+    expect(await page.evaluate(() => localStorage.getItem("timalens-hands"))).toBe("off");
+  });
+
   test("the webcam starts, MediaPipe tracks in the browser, and a pinch drags a bulb onto the bench", async ({ page }) => {
     await openLab(page, "lab=sample-ohm-en&lang=en&view=2d");
     await startHands(page);

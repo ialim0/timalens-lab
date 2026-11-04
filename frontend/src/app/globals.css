@@ -21,6 +21,7 @@
   --grid: #3a4156; --wire: #d9dce6; --board: #121827; --accent: #3d8bff; --blue: #5ea0ff; --danger: #ff6a5e; --shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 16px rgba(0,0,0,.3); --shadow-lg: 0 2px 6px rgba(0,0,0,.4), 0 16px 40px rgba(0,0,0,.45); color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; } /* hidden wins over any display a class gives */
 html, body { margin: 0; background: var(--ground); color: var(--ink); font: 15px/1.5 var(--font); -webkit-font-smoothing: antialiased; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -312,6 +313,8 @@ details.about li { margin: 4px 0; }
 .dock-lab .pill { font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 99px; background: var(--ground); color: var(--muted); }
 .dock-lab:not(:has(img)) { padding-left: 12px; }
 .dock .dock-teach { margin-left: auto; background: transparent; box-shadow: none; color: var(--accent); }
+body.hands-on .dock { padding-right: 270px; } /* room for the camera view in the corner */
+@media (max-width: 600px) { body.hands-on .dock { padding-right: 170px; } }
 .btn.help { font-weight: 700; padding: 6px 12px; }
 
 /* ---------------------------------------------------------------- the guided tour */
@@ -323,3 +326,5 @@ details.about li { margin: 4px 0; }
 .tour-count { font-size: 12px; font-weight: 600; color: var(--accent); }
 .tour-row { display: flex; justify-content: flex-end; gap: 8px; }
 @media (prefers-reduced-motion: reduce) { .tour-spot, .tour-card { transition: none; } }
+
+.intro-note { margin: 10px 0 0; max-width: 360px; font-size: 13px; color: rgba(255, 255, 255, .6); line-height: 1.4; }
