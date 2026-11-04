@@ -85,18 +85,37 @@ If the lesson has nothing to do with electric circuits, answer {"lab": "unsuppor
 "reason": "..."} in the lesson's language.
 """
 
-SCHEMA: dict[str, Any] = {
-    "type": "object",
-    "properties": {
-        "lab": {"type": "string"}, "language": {"type": "string"}, "title": {"type": "string"},
-        "summary": {"type": "string"}, "objectives": {"type": "array", "items": {"type": "string"}},
-        "presets": {"type": "array", "items": {"type": "object"}},
-        "activities": {"type": "array", "items": {"type": "object"}},
-        "challenges": {"type": "array", "items": {"type": "object"}},
-        "quiz": {"type": "array", "items": {"type": "object"}},
-    },
-    "required": ["lab"],
-}
+def _object(properties: dict[str, Any], required: tuple[str, ...] = ()) -> dict[str, Any]:
+    """An object with exactly these keys: decoding is constrained to the schema, so a schema that
+    allows other keys lets the model invent them (it once wrote half a megabyte of them)."""
+    return {"type": "object", "properties": properties, "required": list(required), "additionalProperties": False}
+
+
+_TEXT, _NUMBER, _FLAG = {"type": "string"}, {"type": "number"}, {"type": "boolean"}
+_TEXTS = {"type": "array", "items": _TEXT}
+_GOAL = _object({"quantity": {"type": "string", "enum": ["current", "voltage", "power", "brightness"]}, "component": _TEXT,
+                 "min": _NUMBER, "max": _NUMBER, "lit": _TEXT, "not_burnt": _FLAG, "not_shorted": _FLAG})
+_GOALS = {"type": "array", "items": _GOAL}
+_ELEMENT = _object({"id": _TEXT, "type": {"type": "string", "enum": ["resistor", "bulb", "led", "switch"]},
+                    "R": _NUMBER, "P": _NUMBER, "closed": _FLAG}, ("id", "type"))
+_PRESET = _object({"id": _TEXT, "title": _TEXT, "topology": {"type": "string", "enum": ["series", "parallel", "series_parallel"]},
+                   "battery": _object({"V": _NUMBER}, ("V",)), "elements": {"type": "array", "items": _ELEMENT},
+                   "ammeter": _FLAG, "voltmeter_on": _TEXT, "branch_ammeters": _FLAG}, ("id", "title", "topology", "battery", "elements"))
+_STEP = _object({"kind": {"type": "string", "enum": ["predict", "do", "measure", "observe"]}, "question": _TEXT, "choices": _TEXTS,
+                 "answer": {"type": "integer"}, "why": _TEXT, "instruction": _TEXT, "goals": _GOALS, "points": {"type": "integer"}}, ("kind",))
+_ACTIVITY = _object({"id": _TEXT, "title": _TEXT, "preset": _TEXT, "steps": {"type": "array", "items": _STEP}, "takeaway": _TEXT},
+                    ("id", "title", "preset", "steps"))
+_CHALLENGE = _object({"id": _TEXT, "title": _TEXT, "statement": _TEXT, "preset": _TEXT, "locked": _TEXTS, "goals": _GOALS, "hint": _TEXT},
+                     ("id", "title", "statement", "preset", "goals"))
+_QUESTION = _object({"question": _TEXT, "choices": _TEXTS, "answer": {"type": "integer"}, "explanation": _TEXT}, ("question", "choices", "answer"))
+
+SCHEMA: dict[str, Any] = _object({
+    "version": {"type": "integer"}, "lab": {"type": "string", "enum": ["circuits", "unsupported"]}, "reason": _TEXT,
+    "language": _TEXT, "title": _TEXT, "level": _TEXT, "summary": _TEXT, "view": {"type": "string", "enum": ["2d", "3d"]},
+    "objectives": _TEXTS, "formulas": {"type": "array", "items": _object({"text": _TEXT, "meaning": _TEXT}, ("text",))},
+    "misconceptions": _TEXTS, "presets": {"type": "array", "items": _PRESET}, "activities": {"type": "array", "items": _ACTIVITY},
+    "challenges": {"type": "array", "items": _CHALLENGE}, "quiz": {"type": "array", "items": _QUESTION},
+}, ("lab", "language", "title", "summary", "view", "objectives", "presets", "activities", "challenges", "quiz"))
 
 
 def check(lab: dict[str, Any], node: str) -> list[str]:

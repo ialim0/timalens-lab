@@ -592,3 +592,26 @@ def test_a_lab_cut_short_is_designed_again_with_less_reasoning(monkeypatch):
     monkeypatch.setattr(generate, "check", lambda lab, node: [])
     assert generate.lab_from_lesson(settings(), "La loi d'Ohm. " * 30)["title"] == SAMPLE["title"]
     assert efforts == [None, "low"]
+
+
+
+# ---------------------------------------------------------------- the lab's schema
+def _allowed(value, schema, path="lab"):
+    """Every key in `value` is one the schema names (objects allow no other keys)."""
+    if schema.get("type") == "object":
+        assert schema.get("additionalProperties") is False, f"{path} allows any key"
+        for key, item in value.items():
+            assert key in schema["properties"], f"{path}.{key} is not in the schema"
+            _allowed(item, schema["properties"][key], f"{path}.{key}")
+        for key in schema.get("required", []):
+            assert key in value, f"{path}.{key} is required"
+    elif schema.get("type") == "array":
+        for i, item in enumerate(value):
+            _allowed(item, schema["items"], f"{path}[{i}]")
+
+
+@pytest.mark.parametrize("sample", ["ohm_fr", "ohm_en", "lampes_fr", "lampes_en"])
+def test_the_schema_names_every_field_of_a_real_lab_and_no_other(sample):
+    lab = json.loads((ROOT / "samples" / f"{sample}.lab.json").read_text())
+    lab.setdefault("view", "2d")
+    _allowed(lab, generate.SCHEMA)
